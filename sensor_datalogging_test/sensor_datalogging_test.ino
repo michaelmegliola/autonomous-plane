@@ -29,6 +29,7 @@ const int chipSelect = 4;
 File datalog;
 
 int count = 0;
+unsigned long start;
 
 String getFileName(int i) {
   String s = "DATA";
@@ -39,7 +40,8 @@ String getFileName(int i) {
 
 File getNextAvailableFileHandle() {
   int i = 0;
-  if (SD.exists(getFileName(i))) {
+  while (SD.exists(getFileName(i))) {
+    Serial.println(getFileName(i));
     i++;
   }
   return SD.open(getFileName(i), FILE_WRITE);
@@ -73,7 +75,7 @@ void setup() {
   {
     /* There was a problem detecting the FXAS21002C ... check your connections */
     Serial.println("Ooops, no FXAS21002C detected ... Check your wiring!");
-    while(1);
+    while(true);
   }
 
   /* Initialise the sensor */
@@ -81,22 +83,27 @@ void setup() {
   {
     /* There was a problem detecting the FXOS8700 ... check your connections */
     Serial.println("Ooops, no FXOS8700 detected ... Check your wiring!");
-    while(1);
+    while(true);
   }
+
+  start = millis();
 }
 
 void loop() {
 
-  if (count++ > 1024) {
+  count++;
+  if (millis() > start + 10000) {
     datalog.flush();
     datalog.close();
-    Serial.println("DONE");
-    return;
+    Serial.print("Completed: ");
+    Serial.println(count);
+    while(true);
   }
 
   /* Get a new sensor event */
-  sensors_event_t gyroEvent;
-  gyro.getEvent(&gyroEvent);
+  sensors_event_t event;
+  gyro.getEvent(&event);
+  accelmag.getEvent(&event);
     
   // make a string for assembling the data to log:
   String dataString = "";
@@ -108,12 +115,17 @@ void loop() {
   dataString += ",";
   dataString += bmp.readAltitude(1013.25);
   dataString += ",";
-  dataString += gyroEvent.gyro.x;  
+  dataString += event.gyro.x;  
   dataString += ",";
-  dataString += gyroEvent.gyro.y;  
+  dataString += event.gyro.y;  
   dataString += ",";
-  dataString += gyroEvent.gyro.z;
-   
+  dataString += event.gyro.z;
+  dataString += ",";
+  dataString += accelmag.accel_raw.x;
+  dataString += ",";
+  dataString += accelmag.accel_raw.y;
+  dataString += ",";
+  dataString += accelmag.accel_raw.z;
   // if the file is available, write to it:
   if (datalog) {
     datalog.println(dataString); 
