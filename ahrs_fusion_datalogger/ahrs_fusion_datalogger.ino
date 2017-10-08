@@ -16,7 +16,9 @@
 #define BMP_MOSI 12 
 #define BMP_CS 13
 
-#define LOG 1
+//#define LOG_MODE 1
+#define SERIAL_MODE 1
+#define LED_MODE 1
 
 // Create sensor instances.
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
@@ -53,6 +55,7 @@ File datalog;
 const int chipSelect = 4;
 int count = 0;
 unsigned long start;
+int flicker;
 
 String getFileName(int i) {
   String s = "DATA";
@@ -81,11 +84,18 @@ void setup()
     digitalWrite(8, LOW);
     delay(200);
   }
-  Serial.begin(9600);
-  Serial.println(F("Adafruit AHRS Fusion Example")); Serial.println("");
+  Serial.begin(115200);
+
+  #ifdef SERIAL_MODE
+    while (!Serial) {
+      ; // wait for serial port to connect. Needed for native USB port only
+    }
+  #endif
+  
+  Serial.println(F("Sensor & datalogging test."));
 
   // Initialize the sensors.
-  if(!gyro.begin())
+  if(!gyro.begin(GYRO_RANGE_2000DPS))
   {
     /* There was a problem detecting the gyro ... check your connections */
     Serial.println("Ooops, no gyro detected ... Check your wiring!");
@@ -98,10 +108,16 @@ void setup()
     while(1);
   }
 
+  // initialize BMP temperature & pressure sensor
+  if (!bmp.begin()) {  
+    Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+    while (true);
+  }
+
   // Based on a Bluefruit M0 Feather ... rate should be adjuted for other MCUs
   filter.begin(75);
 
-  #ifdef LOG
+  #ifdef LOG_MODE
     // initialize SD memory card
     if (!SD.begin(chipSelect)) {
       Serial.println("Card failed, or not present");
@@ -121,8 +137,9 @@ void setup()
 
 void loop(void)
 {
-  #ifdef LOG
-    count++;
+  count++;
+  
+  #ifdef LOG_MODE  
     if (millis() > start + 60 * 1000) {
       datalog.flush();
       datalog.close();
@@ -163,9 +180,24 @@ void loop(void)
   gz *= 57.2958F;
 
   // Update the filter
+  
   filter.update(gx, gy, gz,
                 accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z,
                 mx, my, mz);
+  
+
+  //filter.updateIMU(gx, gy, gz, accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z);
+
+  float qw;
+  float qx;
+  float qy;
+  float qz;
+  filter.getQuaternion(&qw, &qx, &qy, &qz);
+
+  Serial.print(qw, 6);
+  Serial.print(qx, 6);
+  Serial.print(qy, 6);
+  Serial.println(qz, 6);
 
   // Print the orientation filter output
   // Note: To avoid gimbal lock you should read quaternions not Euler
@@ -195,7 +227,7 @@ void loop(void)
   float pitch = filter.getPitch();
   float heading = filter.getYaw();
 
-  #ifdef LOG
+  #ifdef LOG_MODE
     if (count % 100 == 0) {
       // make a string for assembling the data to log:
       String dataString = "";
@@ -217,4 +249,31 @@ void loop(void)
       }
     }
   #endif
+
+  #ifdef SERIAL_MODE
+    if (count % 100 == 0) {
+      // make a string for assembling the data to log:
+      String dataString = "";
+      dataString += heading;  
+      dataString += ",";
+      dataString += pitch;  
+      dataString += ",";
+      dataString += roll;
+      Serial.println(dataString); 
+    }
+  #endif
+
+  #ifdef LED_MODE
+    if (pitch > 30.0 || pitch < -30.0) {
+      digitalWrite(8, HIGH);
+    } else {
+      if (flicker % 30 > 15) {
+        digitalWrite(8, LOW);
+      } else {
+        digitalWrite(8, HIGH);
+      }
+      flicker++;
+    }
+  #endif
+
 }

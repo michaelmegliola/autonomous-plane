@@ -70,8 +70,8 @@ void setup() {
     while (true);
   }
 
-    /* Initialise the sensor */
-  if(!gyro.begin())
+    /* Initialise the sensor @ 2000 degrees per second */
+  if(!gyro.begin(GYRO_RANGE_2000DPS))
   {
     /* There was a problem detecting the FXAS21002C ... check your connections */
     Serial.println("Ooops, no FXAS21002C detected ... Check your wiring!");
