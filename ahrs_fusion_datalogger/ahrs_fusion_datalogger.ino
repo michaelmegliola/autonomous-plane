@@ -2,15 +2,26 @@
 #include <Adafruit_Sensor.h>
 #include <Mahony.h>
 #include <Madgwick.h>
+#include <Adafruit_BMP280.h>
 #include <Adafruit_FXAS21002C.h>
 #include <Adafruit_FXOS8700.h>
+#include <SPI.h>
+#include <SD.h>
 
-// Note: This sketch is a WORK IN PROGRESS
+/*
+ * Pin assignments for BMP280 temperature and pressure sensor
+ */
+#define BMP_SCK 10
+#define BMP_MISO 11
+#define BMP_MOSI 12 
+#define BMP_CS 13
+
+#define LOG 1
 
 // Create sensor instances.
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
 Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
-
+Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
 // Mag calibration values are calculated via ahrs_calibration.
 // These values must be determined for each board/environment.
@@ -35,13 +46,42 @@ float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
 //Mahony filter; //lightweight; use on slower systems
 Madgwick filter;
 
+/*
+ * Data logging file
+ */
+File datalog;
+const int chipSelect = 4;
+int count = 0;
+unsigned long start;
+
+String getFileName(int i) {
+  String s = "DATA";
+  s += i;
+  s += ".txt";
+  return s;
+}
+
+File getNextAvailableFileHandle() {
+  int i = 0;
+  Serial.println(getFileName(i));
+  while (SD.exists(getFileName(i))) {
+    Serial.println(getFileName(i));
+    i++;
+  }
+  return SD.open(getFileName(i), FILE_WRITE);
+}
+
 void setup()
 {
-  Serial.begin(115200);
-
-  // Wait for the Serial Monitor to open (comment out to run without Serial Monitor)
-  // while(!Serial);
-
+  // built in green LED 
+  pinMode(8, OUTPUT);
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(8, HIGH);
+    delay(200);
+    digitalWrite(8, LOW);
+    delay(200);
+  }
+  Serial.begin(9600);
   Serial.println(F("Adafruit AHRS Fusion Example")); Serial.println("");
 
   // Initialize the sensors.
@@ -58,13 +98,40 @@ void setup()
     while(1);
   }
 
-  // Filter expects 70 samples per second
   // Based on a Bluefruit M0 Feather ... rate should be adjuted for other MCUs
-  filter.begin(10);
+  filter.begin(75);
+
+  #ifdef LOG
+    // initialize SD memory card
+    if (!SD.begin(chipSelect)) {
+      Serial.println("Card failed, or not present");
+      // don't do anything more:
+      while(true);
+    }
+    datalog = getNextAvailableFileHandle();
+  
+    if (!datalog) {
+      Serial.println("Cannot write data file.");
+      while(true);
+    }
+  #endif
+
+  start = millis();
 }
 
 void loop(void)
 {
+  #ifdef LOG
+    count++;
+    if (millis() > start + 60 * 1000) {
+      datalog.flush();
+      datalog.close();
+      Serial.print("Completed: ");
+      Serial.println(count);
+      while(true);
+    }
+  #endif
+  
   sensors_event_t gyro_event;
   sensors_event_t accel_event;
   sensors_event_t mag_event;
@@ -127,13 +194,27 @@ void loop(void)
   float roll = filter.getRoll();
   float pitch = filter.getPitch();
   float heading = filter.getYaw();
-  Serial.print(millis());
-  Serial.print(" - Orientation: ");
-  Serial.print(heading);
-  Serial.print(" ");
-  Serial.print(pitch);
-  Serial.print(" ");
-  Serial.println(roll);
 
-  delay(10);
+  #ifdef LOG
+    if (count % 100 == 0) {
+      // make a string for assembling the data to log:
+      String dataString = "";
+      dataString += count;
+      dataString += ",";
+      dataString += micros();
+      dataString += ",";
+      dataString += bmp.readTemperature();
+      dataString += ",";
+      dataString += bmp.readAltitude(1013.25);
+      dataString += ",";
+      dataString += heading;  
+      dataString += ",";
+      dataString += pitch;  
+      dataString += ",";
+      dataString += roll;
+      if (datalog) {
+        datalog.println(dataString); 
+      }
+    }
+  #endif
 }
