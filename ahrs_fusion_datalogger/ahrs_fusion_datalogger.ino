@@ -187,17 +187,12 @@ void loop(void)
   
 
   //filter.updateIMU(gx, gy, gz, accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z);
-
+  
   float qw;
   float qx;
   float qy;
   float qz;
   filter.getQuaternion(&qw, &qx, &qy, &qz);
-
-  Serial.print(qw, 6);
-  Serial.print(qx, 6);
-  Serial.print(qy, 6);
-  Serial.println(qz, 6);
 
   // Print the orientation filter output
   // Note: To avoid gimbal lock you should read quaternions not Euler
@@ -252,19 +247,18 @@ void loop(void)
 
   #ifdef SERIAL_MODE
     if (count % 100 == 0) {
-      // make a string for assembling the data to log:
-      String dataString = "";
-      dataString += heading;  
-      dataString += ",";
-      dataString += pitch;  
-      dataString += ",";
-      dataString += roll;
-      Serial.println(dataString); 
+      Serial.print(heading, 6); Serial.print(" "); 
+      Serial.print(pitch, 6); Serial.print(" ");
+      Serial.print(roll,6); Serial.print(" | ");   
+      Serial.print(qw, 6); Serial.print(" ");
+      Serial.print(qx, 6); Serial.print(" ");
+      Serial.print(qy, 6); Serial.print(" ");
+      Serial.println(qz, 6);
     }
   #endif
 
   #ifdef LED_MODE
-    if (pitch > 30.0 || pitch < -30.0) {
+    if (roll > 30.0 || roll < -30.0) {
       digitalWrite(8, HIGH);
     } else {
       if (flicker % 30 > 15) {
