@@ -12,7 +12,7 @@ uint32_t c;
 
 void setup() {
 
-  Serial.println("System core clock = " + SystemCoreClock);
+  
   
   pinMode(LED_PIN,OUTPUT); //this configures the LED pin, you can remove this it's just example code
   tcConfigure(sampleRate); //configure the timer to run at <sampleRate>Hertz

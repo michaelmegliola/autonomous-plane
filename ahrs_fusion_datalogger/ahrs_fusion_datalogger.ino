@@ -18,7 +18,7 @@
 
 //#define LOG_MODE 1
 #define SERIAL_MODE 1
-#define LED_MODE 1
+//#define LED_MODE 1
 
 // Create sensor instances.
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
@@ -95,7 +95,7 @@ void setup()
   Serial.println(F("Sensor & datalogging test."));
 
   // Initialize the sensors.
-  if(!gyro.begin(GYRO_RANGE_2000DPS))
+  if(!gyro.begin(/*GYRO_RANGE_2000DPS9*/))
   {
     /* There was a problem detecting the gyro ... check your connections */
     Serial.println("Ooops, no gyro detected ... Check your wiring!");
@@ -145,7 +145,12 @@ void loop(void)
       datalog.close();
       Serial.print("Completed: ");
       Serial.println(count);
-      while(true);
+      while(true) {
+        digitalWrite(8, HIGH);
+        delay(250);
+        digitalWrite(8, LOW);
+        delay(400);
+      }
     }
   #endif
   
@@ -184,15 +189,8 @@ void loop(void)
   filter.update(gx, gy, gz,
                 accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z,
                 mx, my, mz);
-  
 
   //filter.updateIMU(gx, gy, gz, accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z);
-  
-  float qw;
-  float qx;
-  float qy;
-  float qz;
-  filter.getQuaternion(&qw, &qx, &qy, &qz);
 
   // Print the orientation filter output
   // Note: To avoid gimbal lock you should read quaternions not Euler
@@ -223,37 +221,56 @@ void loop(void)
   float heading = filter.getYaw();
 
   #ifdef LOG_MODE
-    if (count % 100 == 0) {
+    //if (count % 100 == 0) {
       // make a string for assembling the data to log:
       String dataString = "";
       dataString += count;
       dataString += ",";
       dataString += micros();
       dataString += ",";
-      dataString += bmp.readTemperature();
-      dataString += ",";
-      dataString += bmp.readAltitude(1013.25);
-      dataString += ",";
       dataString += heading;  
       dataString += ",";
       dataString += pitch;  
       dataString += ",";
       dataString += roll;
+      dataString += ",";
+      dataString += accel_event.acceleration.x;
+      dataString += ",";
+      dataString += accel_event.acceleration.y;
+      dataString += ",";
+      dataString += accel_event.acceleration.z;
+      dataString += ",";
+      dataString += gyro_event.gyro.x;
+      dataString += ",";
+      dataString += gyro_event.gyro.y;
+      dataString += ",";
+      dataString += gyro_event.gyro.z;
+      dataString += ",";
+      dataString += mag_event.magnetic.x;
+      dataString += ",";
+      dataString += mag_event.magnetic.y;
+      dataString += ",";
+      dataString += mag_event.magnetic.z;
       if (datalog) {
         datalog.println(dataString); 
       }
-    }
+    //}
   #endif
 
   #ifdef SERIAL_MODE
-    if (count % 100 == 0) {
+    if (count % 1000 == 0) {
       Serial.print(heading, 6); Serial.print(" "); 
       Serial.print(pitch, 6); Serial.print(" ");
-      Serial.print(roll,6); Serial.print(" | ");   
-      Serial.print(qw, 6); Serial.print(" ");
-      Serial.print(qx, 6); Serial.print(" ");
-      Serial.print(qy, 6); Serial.print(" ");
-      Serial.println(qz, 6);
+      Serial.print(roll, 6); Serial.print(" | ");
+      Serial.print(accel_event.acceleration.x, 6); Serial.print(" ");
+      Serial.print(accel_event.acceleration.y, 6); Serial.print(" ");
+      Serial.print(accel_event.acceleration.z, 6); Serial.print(" | ");
+      Serial.print(gyro_event.gyro.x, 6); Serial.print(" ");
+      Serial.print(gyro_event.gyro.y, 6); Serial.print(" ");
+      Serial.print(gyro_event.gyro.z, 6); Serial.print(" | ");
+      Serial.print(mag_event.magnetic.x, 6); Serial.print(" ");
+      Serial.print(mag_event.magnetic.y, 6); Serial.print(" ");
+      Serial.println(mag_event.magnetic.z, 6);
     }
   #endif
 
