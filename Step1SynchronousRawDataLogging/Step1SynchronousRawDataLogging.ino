@@ -127,13 +127,6 @@ int countNoMovement;
 SensorReadings* priorReadings;
 
 void setup() { 
-  
-  //delete these lines
-  Serial.begin(9600);
-  while(!Serial); 
-  Serial.println("testing...");
-  //end delete
-  
   initializeLEDs();
   initializeSdCard();
   initializeSensorArray();
@@ -173,8 +166,6 @@ void loop() {
 
   // blink green LED
   if (millis() > blink_time + 250) {
-    // delete next line
-    Serial.println(countNoMovement);
     if (blink) digitalWrite(GREEN_LED, LOW);
     else digitalWrite(GREEN_LED, HIGH);
     blink = !blink;
