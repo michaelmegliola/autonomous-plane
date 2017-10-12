@@ -1,8 +1,15 @@
 /*
- * Step 1. Raw data logging.
+ * Step 1. Synchronous raw data logging.
  * 
- * For the code that sets up the timer and callback function,
- * special thanks to Sheng Chen https://gist.github.com/jdneo
+ * This sketch logs data to and SDI (Micro SD) file as quickly
+ * as possible. There is no timer or synchronization... the loop
+ * simply takes sensor readings and writes raw, uncalibrated
+ * results to a file.
+ * 
+ * The purpose of this step is to fly the aircraft by remote
+ * control while collecting actual sensor readings. By aligning
+ * those readings in time with a video of the flight, models can
+ * be developed for (a) filters and (b) fusion algorithms.
  */
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
@@ -28,8 +35,9 @@
  */
 class SensorReadings {
   
-  const float JITTER = 0.20;
+  const float JITTER = 0.10;
   
+  public: 
   unsigned long timestamp; 
   float altitude;
   float temperature;
@@ -43,8 +51,12 @@ class SensorReadings {
   float magY;
   float magZ;
 
-  public:
-  SensorReadings(unsigned long time, Adafruit_BMP280 bmp, sensors_event_t* gyroEvent, sensors_event_t* accelEvent, sensors_event_t* magEvent) {
+  SensorReadings(unsigned long time, 
+                 Adafruit_BMP280 bmp, 
+                 sensors_event_t* gyroEvent, 
+                 sensors_event_t* accelEvent, 
+                 sensors_event_t* magEvent) {
+                  
     timestamp = time;
     altitude = bmp.readAltitude(1013.25);
     temperature = bmp.readTemperature();
@@ -59,7 +71,6 @@ class SensorReadings {
     magZ = magEvent->magnetic.z;
   }
 
-  public:
   boolean moved(SensorReadings* prior) {
     boolean r = false;
     r  = abs(accX - prior->accX) > JITTER;
@@ -68,7 +79,6 @@ class SensorReadings {
     return r;
   }
 
-  public:
   String getDataString() {
     String data;
     data += timestamp;
@@ -98,6 +108,9 @@ class SensorReadings {
   }
 };
 
+const int MIN_TIME_HORIZON =  2 * 60 * 1000; // two minutes
+const int MAX_TIME_HORIZON = 10 * 60 * 1000; // ten minutes
+
 // sensors
 Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
@@ -106,46 +119,74 @@ Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
 // data logging file
 File datalog;
 
-uint16_t prior_event_time;
-uint16_t start_time;
+unsigned long start_time;
+unsigned long blink_time;
+boolean blink;
 
 int countNoMovement;
 SensorReadings* priorReadings;
 
-void setup() {  
+void setup() { 
+  
+  //delete these lines
   Serial.begin(9600);
-  while(!Serial);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(RED_LED, OUTPUT);
-  digitalWrite(RED_LED, LOW);
-  digitalWrite(GREEN_LED, LOW);
+  while(!Serial); 
+  Serial.println("testing...");
+  //end delete
+  
+  initializeLEDs();
   initializeSdCard();
   initializeSensorArray();
   datalog = getNextAvailableFileHandle();
   countNoMovement = 0;
   priorReadings = getSensorReadings();
+  start_time = millis();
+  blink_time = start_time;
   delay(100);
 }
 
 void loop() {
+  
   SensorReadings* readings = getSensorReadings();
   datalog.println(readings->getDataString());
+
   if (readings->moved(priorReadings)) {
-    countNoMovement = 0;
+    countNoMovement = 0; //reset counter if sensor detects significant movement
   } else {
-    countNoMovement++;
+    countNoMovement++;   //count consecutive loops with no significant movement
   }
-  Serial.println(countNoMovement);
+
   delete priorReadings;
   priorReadings = readings;
-  if (countNoMovement > 1000) {
-    datalog.flush();
-    datalog.close();
-    while (true) {
-      digitalWrite(GREEN_LED, HIGH);
-      digitalWrite(GREEN_LED, HIGH);
+
+  // check for shutdown conditions
+  if (readings->timestamp > start_time + MIN_TIME_HORIZON) {
+    if (countNoMovement > 1000 || readings->timestamp > start_time + MAX_TIME_HORIZON) {
+      datalog.flush();
+      datalog.close();
+      while (true) {
+        digitalWrite(GREEN_LED, HIGH);
+        digitalWrite(GREEN_LED, HIGH);
+      }
     }
   }
+
+  // blink green LED
+  if (millis() > blink_time + 250) {
+    // delete next line
+    Serial.println(countNoMovement);
+    if (blink) digitalWrite(GREEN_LED, LOW);
+    else digitalWrite(GREEN_LED, HIGH);
+    blink = !blink;
+    blink_time = millis();
+  }
+}
+
+void initializeLEDs() {
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(GREEN_LED, LOW);
 }
 
 void terminalError() {
@@ -180,7 +221,7 @@ void initializeSensorArray() {
 String getFileName(int i) {
   String s = "DATA";
   s += i;
-  s += ".txt";
+  s += ".csv";
   return s;
 }
 
