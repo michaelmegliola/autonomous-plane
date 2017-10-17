@@ -44,6 +44,9 @@ class SensorReadings {
   float gyroX;
   float gyroY;
   float gyroZ;
+  float gyroRawX;
+  float gyroRawY;
+  float gyroRawZ;
   float accX;
   float accY;
   float accZ;
@@ -51,18 +54,21 @@ class SensorReadings {
   float magY;
   float magZ;
 
-  SensorReadings(unsigned long time, 
-                 Adafruit_BMP280 bmp, 
+  SensorReadings(Adafruit_BMP280* bmp, 
+                 Adafruit_FXAS21002C* gyro,
                  sensors_event_t* gyroEvent, 
                  sensors_event_t* accelEvent, 
                  sensors_event_t* magEvent) {
                   
-    timestamp = time;
-    altitude = bmp.readAltitude(1013.25);
-    temperature = bmp.readTemperature();
+    timestamp = gyroEvent->timestamp;
+    altitude = bmp->readAltitude(1013.25);
+    temperature = bmp->readTemperature();
     gyroX = gyroEvent->gyro.x;
     gyroY = gyroEvent->gyro.y;
     gyroZ = gyroEvent->gyro.z;
+    gyroRawX = gyro->raw.x;
+    gyroRawY = gyro->raw.y;
+    gyroRawZ = gyro->raw.z;
     accX = accelEvent->acceleration.x;
     accY = accelEvent->acceleration.y;
     accZ = accelEvent->acceleration.z;
@@ -79,37 +85,35 @@ class SensorReadings {
     return r;
   }
 
-  String getDataString() {
-    String data;
-    data += timestamp;
-    data += ",";
-    data += altitude;
-    data += ",";
-    data += temperature;
-    data += ",";
-    data += gyroX;
-    data += ",";
-    data += gyroY;  
-    data += ",";
-    data +=  gyroZ;
-    data += ",";
-    data +=  accX;
-    data += ",";
-    data +=  accY;
-    data += ",";
-    data +=  accZ;
-    data += ",";
-    data +=  magX;
-    data += ",";
-    data +=  magY;
-    data += ",";
-    data +=  magZ;
-    return data;
+  void writeToFile(File* file) {
+    file->print(timestamp);
+    file->print(",");
+    file->print(altitude);
+    file->print(",");
+    file->print(temperature);
+    file->print(",");
+    file->print(gyroX, 12);
+    file->print(",");
+    file->print(gyroY, 12);
+    file->print(",");
+    file->print(gyroZ, 12);
+    file->print(",");
+    file->print(gyroRawX, 12);
+    file->print(",");
+    file->print(gyroRawY, 12);
+    file->print(",");
+    file->print(gyroRawZ, 12);
+    file->print(",");
+    file->print(accX, 6);
+    file->print(",");
+    file->print(accY, 6);
+    file->print(",");
+    file->println(accZ, 6);
   }
 };
 
 const int MIN_TIME_HORIZON =  2 * 60 * 1000; // two minutes
-const int MAX_TIME_HORIZON = 10 * 60 * 1000; // ten minutes
+const int MAX_TIME_HORIZON =  5 * 60 * 1000; // five minutes
 
 // sensors
 Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
@@ -141,7 +145,7 @@ void setup() {
 void loop() {
   
   SensorReadings* readings = getSensorReadings();
-  datalog.println(readings->getDataString());
+  readings->writeToFile(&datalog);
 
   if (readings->moved(priorReadings)) {
     countNoMovement = 0; //reset counter if sensor detects significant movement
@@ -170,6 +174,7 @@ void loop() {
     else digitalWrite(GREEN_LED, HIGH);
     blink = !blink;
     blink_time = millis();
+    datalog.flush();
   }
 }
 
@@ -228,6 +233,6 @@ SensorReadings* getSensorReadings() {
   sensors_event_t gyroEvent, accelEvent, magEvent;
   gyro.getEvent(&gyroEvent);
   accelmag.getEvent(&accelEvent, &magEvent);
-  return new SensorReadings(millis(), bmp, &gyroEvent, &accelEvent, &magEvent);
+  return new SensorReadings(&bmp, &gyro, &gyroEvent, &accelEvent, &magEvent);
 }
 
