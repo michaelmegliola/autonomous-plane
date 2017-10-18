@@ -36,8 +36,6 @@
  */
 class SensorReadings {
   
-  const float JITTER = 0.10;
-  
   public: 
   unsigned long timestamp; 
   float altitude;
@@ -85,14 +83,6 @@ class SensorReadings {
     magX = magEvent->magnetic.x;
     magY = magEvent->magnetic.y;
     magZ = magEvent->magnetic.z;
-  }
-
-  boolean moved(SensorReadings *prior) {
-    boolean r = false;
-    r  = abs(accX - prior->accX) > JITTER;
-    r |= abs(accY - prior->accY) > JITTER;
-    r |= abs(accZ - prior->accZ) > JITTER;
-    return r;
   }
 };
 
@@ -247,11 +237,11 @@ void writeToFile() {
   datalog.print(",");
   datalog.print(readings->accY, 6);
   datalog.print(",");
-  datalog.println(readings->accZ, 6);
+  datalog.print(readings->accZ, 6);
   datalog.print(",");
-  datalog.println(accFilter->getAccX(), 6);
+  datalog.print(accFilter->getAccX(), 6);
   datalog.print(",");
-  datalog.println(accFilter->getAccY(), 6);
+  datalog.print(accFilter->getAccY(), 6);
   datalog.print(",");
   datalog.println(accFilter->getAccZ(), 6);
 }
