@@ -87,13 +87,7 @@ class SensorReadings {
     accelEvent = new sensors_event_t();
     magEvent = new sensors_event_t();
     
-    //reset calibration metrics
-    gyroXcal = 0.0;
-    gyroYcal = 0.0;
-    gyroZcal = 0.0;
-    altitudeCal = 0.0;
-    calibrationCount = 0;
-    calibrated = false;
+    resetCalibrationMetrics();
   }
 
   void update() { 
@@ -162,6 +156,15 @@ class SensorReadings {
   }
 
   private:
+  void resetCalibrationMetrics() {
+    gyroXcal = 0.0;
+    gyroYcal = 0.0;
+    gyroZcal = 0.0;
+    altitudeCal = 0.0;
+    calibrationCount = 0;
+    calibrated = false;
+  }
+  
   void calibrate() {
     if (!calibrated) {
       //trap prior accelerometer values
@@ -171,7 +174,7 @@ class SensorReadings {
       //update to current values
       update();
       //compare prior to current values
-      if (true/*abs(accX) < ACCEL_JITTER && abs(accY) < ACCEL_JITTER && abs(az - accZ) < ACCEL_JITTER*/) {
+      if (abs(accX) < ACCEL_JITTER && abs(accY) < ACCEL_JITTER && abs(az - accZ) < ACCEL_JITTER) {
         if (calibrationCount >= MIN_CALIBRATION_COUNT) {
           accXcal /= (float) calibrationCount;
           accYcal /= (float) calibrationCount;
@@ -192,7 +195,7 @@ class SensorReadings {
           calibrationCount++;
         }
       } else {
-        calibrationCount = 0;
+        resetCalibrationMetrics();
       }
     }
   }
