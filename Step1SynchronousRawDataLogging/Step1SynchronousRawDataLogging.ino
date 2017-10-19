@@ -129,8 +129,9 @@ class SensorReadings {
     boolean flash = false;
     while (!calibrated) {
       calibrate();
-      if (millis() > start + 500) {   
+      if (millis() > start + 50) {   
         digitalWrite(RED_LED, flash ? HIGH : LOW);
+        digitalWrite(GREEN_LED, flash ? HIGH : LOW);
         flash = !flash; 
         start = millis();
       }
@@ -158,7 +159,6 @@ class SensorReadings {
     file->println(temperature, 12);
     file->println("=== END SENSOR CALIBRATION ====================");
     file->flush();
-    while(true);
   }
 
   private:
@@ -275,7 +275,7 @@ class GyroIntegrator {
   }
 
   void update(SensorReadings *sensorReadings) {
-    
+    //todo
   }
 };
 
@@ -304,7 +304,6 @@ void setup() {
 }
 
 void loop() {
-  
   readings->update();
   accFilter->update(readings);
   writeToFile();
