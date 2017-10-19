@@ -31,8 +31,9 @@
 #define RED_LED 13    // Onboard LED
 #define CHIP_SELECT 4 // SDI (micro SD memory card)
 
-#define ACCEL_JITTER 0.20
-#define MIN_CALIBRATION_COUNT 1000
+#define ACCEL_JITTER 0.20           //maximum acceptable deviation for calibration
+#define G -9.80665                  //acceleration of gravity (minus sign = downward)
+#define MIN_CALIBRATION_COUNT 1000  //minimum consecutive calibration loops
 /*
  * Represents a single, complete set of sensor readings at a specified point in time (to the millisecond).
  */
@@ -157,6 +158,9 @@ class SensorReadings {
 
   private:
   void resetCalibrationMetrics() {
+    accXcal = 0.0;
+    accYcal = 0.0;
+    accZcal = 0.0;
     gyroXcal = 0.0;
     gyroYcal = 0.0;
     gyroZcal = 0.0;
@@ -174,7 +178,7 @@ class SensorReadings {
       //update to current values
       update();
       //compare prior to current values
-      if (abs(accX) < ACCEL_JITTER && abs(accY) < ACCEL_JITTER && abs(az - accZ) < ACCEL_JITTER) {
+      if (abs(accX) < ACCEL_JITTER && abs(accY) < ACCEL_JITTER && abs(accZ - G) < ACCEL_JITTER) {
         if (calibrationCount >= MIN_CALIBRATION_COUNT) {
           accXcal /= (float) calibrationCount;
           accYcal /= (float) calibrationCount;
