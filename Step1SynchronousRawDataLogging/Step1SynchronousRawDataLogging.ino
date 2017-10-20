@@ -31,9 +31,11 @@
 #define RED_LED 13    // Onboard LED
 #define CHIP_SELECT 4 // SDI (micro SD memory card)
 
-#define ACCEL_JITTER 0.20           //maximum acceptable deviation for calibration
+#define ACCEL_JITTER 0.50           //maximum acceptable deviation for calibration
 #define G -9.80665                  //acceleration of gravity (minus sign = downward)
 #define MIN_CALIBRATION_COUNT 1000  //minimum consecutive calibration loops
+#define RADIANS_TO_DEGREES 57.2958  //conversion factor for Gyro (library is in radians)
+
 /*
  * Represents a single, complete set of sensor readings at a specified point in time (to the millisecond).
  */
@@ -43,6 +45,7 @@ class SensorReadings {
 
   //primary registers
   unsigned long timestamp; 
+  float timespan;
   float altitude;
   float temperature;
   float gyroX;
@@ -94,6 +97,7 @@ class SensorReadings {
   void update() { 
     gyro->getEvent(gyroEvent);
     accelmag->getEvent(accelEvent, magEvent);
+    timespan = (float) (gyroEvent->timestamp - timestamp) / 1000.0;
     timestamp = gyroEvent->timestamp;
     altitude = barometer->readAltitude(1013.25);
     temperature = barometer->readTemperature();
@@ -135,7 +139,7 @@ class SensorReadings {
   }
 
   void describe(File *file) {
-    file->println("=== START SENSOR CALIBRATION ==================");
+    file->println("START SENSOR CALIBRATION");
     file->print("accXcal,");
     file->println(accXcal, 12);
     file->print("accYcal,");
@@ -152,7 +156,7 @@ class SensorReadings {
     file->println(altitudeCal, 12);
     file->print("temperature,");
     file->println(temperature, 12);
-    file->println("=== END SENSOR CALIBRATION ====================");
+    file->println("END SENSOR CALIBRATION");
     file->flush();
   }
 
@@ -167,6 +171,13 @@ class SensorReadings {
     altitudeCal = 0.0;
     calibrationCount = 0;
     calibrated = false;
+    // flash in a recognizable pattern
+    for (int i = 0; i < 10; i++) {
+      digitalWrite(GREEN_LED, HIGH);
+      delay(100);
+      digitalWrite(GREEN_LED, LOW);
+      delay(300);
+    }
   }
   
   void calibrate() {
@@ -191,14 +202,14 @@ class SensorReadings {
         } else {
           accXcal += accX;
           accYcal += accY;
-          accZcal += accZ;
+          accZcal += accZ - G;
           gyroXcal += gyroX;
           gyroYcal += gyroY;
           gyroZcal += gyroZ;
           altitudeCal += altitude;
           calibrationCount++;
         }
-      } else {
+      } else {    
         resetCalibrationMetrics();
       }
     }
@@ -210,6 +221,7 @@ class SensorReadings {
 
   public:
   unsigned long getTimestamp() {return timestamp;}
+  float getTimespan() {return timespan;}
   float getTemperature() {return temperature;}
   float getAccX() {return accX - accXcal;}
   float getAccY() {return accY - accYcal;}
@@ -220,27 +232,30 @@ class SensorReadings {
   float getAltitude() {return altitude - altitudeCal;}
 };
 
-class AccLowPassFilter {
+class LowPassFilter {
 
   private:
   
   float *accXbuffer;
   float *accYbuffer;
   float *accZbuffer;
+  float *altBuffer;
   int i;
   int size;
 
   public:
   
-  AccLowPassFilter(int buffersize) {
+  LowPassFilter(int buffersize) {
     size = buffersize;
     accXbuffer = new float[size];
     accYbuffer = new float[size];
     accZbuffer = new float[size];
+    altBuffer = new float[size];
     for (int n = 0; n < size; n++) {
       accXbuffer[n] = 0.0;
       accYbuffer[n] = 0.0;
       accZbuffer[n] = 0.0;
+      altBuffer[n] = 0.0;
     }
     i = 0;
   }
@@ -249,13 +264,15 @@ class AccLowPassFilter {
     accXbuffer[i] = sensorReadings->getAccX();
     accYbuffer[i] = sensorReadings->getAccY();
     accZbuffer[i] = sensorReadings->getAccZ();
+    altBuffer[i] = sensorReadings->getAltitude();
     i = ++i % size;
   }
   
   float getAccX() {return getAverageValue(accXbuffer);}
   float getAccY() {return getAverageValue(accYbuffer);}
   float getAccZ() {return getAverageValue(accZbuffer);}
-
+  float getAltitude() {return getAverageValue(altBuffer);}
+  
   private:
   float getAverageValue(float *vals) {
     float sum = 0.0;
@@ -271,7 +288,6 @@ class GyroIntegrator {
   float ix;
   float iy;
   float iz;
-  unsigned long timestamp;
   
   public:
   
@@ -281,8 +297,23 @@ class GyroIntegrator {
     iz = 0.0;
   }
 
-  void update(SensorReadings *sensorReadings) {
-    //todo
+  void update(SensorReadings *s) {
+    ix += s->getGyroX() * RADIANS_TO_DEGREES * s->getTimespan();
+    iy += s->getGyroY() * RADIANS_TO_DEGREES * s->getTimespan();
+    iz += s->getGyroZ() * RADIANS_TO_DEGREES * s->getTimespan();
+    //TODO: add correction based upon accelerometer, if in bounds.
+  }
+
+  double getRoll() {
+    return iy;
+  }
+
+  double getPitch() {
+    return ix;
+  }
+
+  double getYaw() {
+    return iz;
   }
 };
 
@@ -291,7 +322,8 @@ File datalog;
 
 // Low pass filter for accelerometer data
 SensorReadings *readings;
-AccLowPassFilter *accFilter;
+LowPassFilter *lpf;
+GyroIntegrator *gyroIntegrator;
 
 unsigned long start_time;
 unsigned long blink_time;
@@ -304,19 +336,21 @@ void setup() {
   readings = new SensorReadings();
   readings->recalibrate();
   readings->describe(&datalog);
-  accFilter = new AccLowPassFilter(ACC_FILTER_BUFFER_SIZE);
+  lpf = new LowPassFilter(ACC_FILTER_BUFFER_SIZE);
+  gyroIntegrator = new GyroIntegrator();
+  writeFileHeader();
   start_time = millis();
   blink_time = start_time;
-  delay(100);
 }
 
 void loop() {
   readings->update();
-  accFilter->update(readings);
+  lpf->update(readings);
+  gyroIntegrator->update(readings);
   writeToFile();
 
   // blink green LED
-  if (millis() > blink_time + 250) {
+  if (millis() > blink_time + 1250) {
     digitalWrite(GREEN_LED, blink ? LOW : HIGH);
     blink = !blink;
     blink_time = millis();
@@ -352,12 +386,24 @@ File getNextAvailableFileHandle() {
   return SD.open(getFileName(i), FILE_WRITE);
 }
 
+void writeFileHeader() {
+  datalog.println("timestamp,timespan(s),altitude,temperature,accX,accY,accZ,gyroX,gyroY,gyroZ,pitch,roll,yaw");
+}
+
 void writeToFile() {
   datalog.print(readings->getTimestamp());
   datalog.print(",");
-  datalog.print(readings->getAltitude());
+  datalog.print(readings->getTimespan(), 12);
+  datalog.print(",");
+  datalog.print(lpf->getAltitude());
   datalog.print(",");
   datalog.print(readings->getTemperature());
+  datalog.print(",");  
+  datalog.print(lpf->getAccX(), 6);
+  datalog.print(",");
+  datalog.print(lpf->getAccY(), 6);
+  datalog.print(",");
+  datalog.print(lpf->getAccZ(), 6);
   datalog.print(",");
   datalog.print(readings->getGyroX(), 12);
   datalog.print(",");
@@ -365,16 +411,10 @@ void writeToFile() {
   datalog.print(",");
   datalog.print(readings->getGyroZ(), 12);
   datalog.print(",");
-  datalog.print(readings->getAccX(), 6);
+  datalog.print(gyroIntegrator->getPitch(), 6);
   datalog.print(",");
-  datalog.print(readings->getAccY(), 6);
+  datalog.print(gyroIntegrator->getRoll(), 6);
   datalog.print(",");
-  datalog.print(readings->getAccZ(), 6);
-  datalog.print(",");
-  datalog.print(accFilter->getAccX(), 6);
-  datalog.print(",");
-  datalog.print(accFilter->getAccY(), 6);
-  datalog.print(",");
-  datalog.println(accFilter->getAccZ(), 6);
+  datalog.println(gyroIntegrator->getYaw(), 6);
 }
 
