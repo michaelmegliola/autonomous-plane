@@ -27,6 +27,10 @@
 #define BMP_MOSI 12 
 #define BMP_CS 13
 
+#define ESC 5;        // Electronic speed control
+#define ELEVATOR 6;   // Elevator servo
+#define AILERON 7;    // Aileron servo
+
 #define GREEN_LED 8   // Onboard LED
 #define RED_LED 13    // Onboard LED
 #define CHIP_SELECT 4 // SDI (micro SD memory card)
@@ -37,7 +41,21 @@
 #define RADIANS_TO_DEGREES 57.2958  //conversion factor for Gyro (library is in radians)
 
 /*
- * Represents a single, complete set of sensor readings at a specified point in time (to the millisecond).
+ * Flight modes in order of precedence
+ */
+const int FM_TERMINATE           = 0x0001;
+const int FM_PREFLIGHT_CALIBRATE = 0x0002;
+const int FM_PREFLIGHT_ARM       = 0x0004;
+const int FM_TAKEOFF             = 0x0008;
+const int FM_LAND_IMMEDIATELY    = 0x0016;
+const int FM_MAINTAIN_ALTITUDE   = 0x0032;
+const int FM_RECALIBRATE_AHRS    = 0x0064;
+const int FM_SEEK_WAYPOINT       = 0x0128;
+const int FM_LOITER              = 0x0256;
+
+/*
+ * Represents a single, complete set of sensor readings at a 
+ * specified point in time (to the nearest millisecond).
  */
 class SensorReadings {
   
@@ -215,11 +233,8 @@ class SensorReadings {
     }
   }
   
-  boolean isCalibrated() {
-    return calibrated;
-  }
-
   public:
+  boolean isCalibrated() {return calibrated;}
   unsigned long getTimestamp() {return timestamp;}
   float getTimespan() {return timespan;}
   float getTemperature() {return temperature;}
@@ -327,6 +342,8 @@ GyroIntegrator *gyroIntegrator;
 
 unsigned long start_time;
 unsigned long blink_time;
+unsigned int flight_mode;
+
 boolean blink;
 
 void setup() { 
@@ -334,28 +351,63 @@ void setup() {
   initializeSdCard();
   datalog = getNextAvailableFileHandle();
   readings = new SensorReadings();
-  readings->recalibrate();
-  readings->describe(&datalog);
   lpf = new LowPassFilter(ACC_FILTER_BUFFER_SIZE);
   gyroIntegrator = new GyroIntegrator();
   writeFileHeader();
   start_time = millis();
   blink_time = start_time;
+  flight_mode = FM_PREFLIGHT_CALIBRATE;
 }
 
 void loop() {
+  // read sensors and update related data structures
   readings->update();
   lpf->update(readings);
   gyroIntegrator->update(readings);
+
+  if (flight_mode & FM_TERMINATE) {
+    setThrottle(0.0);
+    dataLog.flush();
+  } else if (flight_mode & FM_PREFLIGHT_CALIBRATE) {
+    readings->recalibrate();
+    readings->describe(&datalog);
+    flight_mode = readings->calibrated() ? FM_PREFLIGHT_ARM : FM_TERMINATE;
+  } else if (flight_mode & FM_PREFLIGHT_ARM) {
+    armESC();
+    waitForPitch();
+    flight_mode = TAKEOFF;
+  } else if (flight_mode & FM_TAKEOFF) {
+    
+  } else if (flight_mode & FM_sLAND_IMMEDIATELY) {
+    landImmediately();
+  } else if (flight_mode & FM_MAINTAIN_ALTITUDE) {
+  } else if (flight_mode & FM_RECALIBRATE_AHRS) {
+    recalibrateAHRS();
+  } else if (flight_mode & FM_SEEK_WAYPOINT) {
+    seekWaypoint();
+  } else if (flight_mode & FM_LOITER) {
+    loiter();
+  } else {
+    flight_mode = FM_LAND_IMMEDIATELY;
+  }
+
+  //record sensor readings (should be last item in loop(),
+  //because writing can be slow, and any changes to throttle
+  //or control surfaces should not be delayed.
   writeToFile();
 
-  // blink green LED
-  if (millis() > blink_time + 1250) {
+  // blink green LED & flush data (so that data is always
+  // available regardless of how or when flight ends).
+  if (millis() > blink_time + 1500) {
     digitalWrite(GREEN_LED, blink ? LOW : HIGH);
     blink = !blink;
     blink_time = millis();
     datalog.flush();
   }
+}
+
+void setThrottle(float setting) {
+  // here
 }
 
 void initializeLEDs() {
