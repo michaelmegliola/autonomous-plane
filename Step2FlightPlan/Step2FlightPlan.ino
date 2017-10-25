@@ -320,6 +320,60 @@ class GyroIntegrator {
   }
 };
 
+class Elevator {
+
+  private:
+  
+  const float maxPitch =  10.0;
+  const float minPitch = -10.0;
+  const float maxDelta =   2.0;
+  const float minDelta =  -2.0;
+  
+  float pitch;
+
+  public:
+  Elevator() {
+    pitch = 0.0;
+  }
+
+  void setPitch(float p) {
+    p = p > maxPitch ? maxPitch : p;
+    p = p < minPitch ? minPitch : p;
+    float delta = p - pitch;
+    delta = delta > maxDelta ? maxDelta : delta;
+    delta = delta < minDelta ? minDelta : delta;
+    pitch += delta;
+    //here - scale to servo width (milliseconds), set servo output pin
+  }
+};
+
+class Ailerons {
+
+  private:
+  
+  const float maxPitch =  10.0;
+  const float minPitch = -10.0;
+  const float maxDelta =   2.0;
+  const float minDelta =  -2.0;
+  
+  float roll;
+
+  public:
+  Ailerons() {
+    roll = 0.0;
+  }
+
+  void setPitch(float p) {
+    p = p > maxPitch ? maxPitch : p;
+    p = p < minPitch ? minPitch : p;
+    float delta = p - roll;
+    delta = delta > maxDelta ? maxDelta : delta;
+    delta = delta < minDelta ? minDelta : delta;
+    roll += delta;
+    //here - scale to servo width (milliseconds), set servo output pin
+  }
+};
+
 // data logging file
 File datalog;
 
@@ -327,6 +381,10 @@ File datalog;
 SensorReadings *readings;
 LowPassFilter *lpf;
 GyroIntegrator *gyroIntegrator;
+
+//Control surfaces
+Elevator elevator;
+Ailerons ailerons;
 
 unsigned long start_time;
 unsigned long blink_time;
@@ -344,7 +402,7 @@ void setup() {
   writeFileHeader();
   start_time = millis();
   blink_time = start_time;
-  flight_mode = FM_PREFLIGHT_CALIBRATE;
+  flight_mode = BL_PREFLIGHT_CALIBRATE;
 }
 
 void loop() {
@@ -355,12 +413,12 @@ void loop() {
 
   if (flight_mode & FM_TERMINATE) {
     setThrottle(0.0);
-    setAileron(0.0);
+    setAilerons(0.0);
     setElevator(10.0);
   } else if (flight_mode & BL_PREFLIGHT_CALIBRATE) {
     readings->recalibrate();
     readings->describe(&datalog);
-    flight_mode = readings->isCalibrated() ? FM_PREFLIGHT_ARM : FM_TERMINATE;
+    flight_mode = readings->isCalibrated() ? BL_PREFLIGHT_ARM : FM_TERMINATE;
   } else if (flight_mode & BL_PREFLIGHT_ARM) {
     armESC();
     waitForPitch();
