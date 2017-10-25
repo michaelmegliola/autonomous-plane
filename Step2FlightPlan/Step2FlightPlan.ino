@@ -5,19 +5,22 @@
 #include <Adafruit_FXOS8700.h>
 #include <SPI.h>
 #include <SD.h>
+#include <Servo.h>
 
 #define CPU_HZ 48000000
 #define TIMER_PRESCALER_DIV 1024
 #define ACC_FILTER_BUFFER_SIZE 4
+#define SERVO_MIN_MICROSECONDS 1000
+#define SERVO_MAX_MICROSECONDS 2000
 
 #define BMP_SCK 10    // BMP280 pin assignments
 #define BMP_MISO 11
 #define BMP_MOSI 12 
 #define BMP_CS 13
 
-#define ESC 5;        // Electronic speed control
-#define ELEVATOR 6;   // Elevator servo
-#define AILERON 7;    // Aileron servo
+#define ESC_PIN 5        // Electronic speed control
+#define ELEVATOR_PIN 6   // Elevator servo
+#define AILERON_PIN 7    // Aileron servo
 
 #define GREEN_LED 8   // Onboard LED
 #define RED_LED 13    // Onboard LED
@@ -363,14 +366,50 @@ class Ailerons {
     roll = 0.0;
   }
 
-  void setPitch(float p) {
-    p = p > maxPitch ? maxPitch : p;
-    p = p < minPitch ? minPitch : p;
-    float delta = p - roll;
+  void setRoll(float r) {
+    r = r > maxPitch ? maxPitch : r;
+    r = r < minPitch ? minPitch : r;
+    float delta = r - roll;
     delta = delta > maxDelta ? maxDelta : delta;
     delta = delta < minDelta ? minDelta : delta;
     roll += delta;
     //here - scale to servo width (milliseconds), set servo output pin
+  }
+};
+
+class ESC {
+  private:
+  int throttleMs;
+  int rangeMs;
+  boolean armed;
+  Servo esc;
+  
+  public:
+  ESC() {
+    esc.attach(ESC_PIN);
+    throttleMs = SERVO_MIN_MICROSECONDS;
+    rangeMs = SERVO_MAX_MICROSECONDS - SERVO_MIN_MICROSECONDS;
+    armed = false;
+  }
+
+  boolean isArmed() {return armed;}
+
+  void arm() {
+    //arm esc -- mimics stick movements from radio control
+    //go to min, wait, then max, wait, then min
+    esc.writeMicroseconds(SERVO_MIN_MICROSECONDS);
+    delay(2000);
+    esc.writeMicroseconds(SERVO_MAX_MICROSECONDS);
+    delay(2000);
+    esc.writeMicroseconds(SERVO_MIN_MICROSECONDS);
+    delay(2000);
+    armed = true;
+  }
+
+  void setThrottle(float v) {
+    v = v > 10.0 ? 10.0 : v;
+    v = v <  0.0 ?  0.0 : v;
+    throttleMs = SERVO_MIN_MICROSECONDS + (v/10.0) * rangeMs;
   }
 };
 
@@ -381,10 +420,11 @@ File datalog;
 SensorReadings *readings;
 LowPassFilter *lpf;
 GyroIntegrator *gyroIntegrator;
+ESC *esc;
 
 //Control surfaces
-Elevator elevator;
-Ailerons ailerons;
+Elevator *elevator;
+Ailerons *ailerons;
 
 unsigned long start_time;
 unsigned long blink_time;
@@ -399,6 +439,9 @@ void setup() {
   readings = new SensorReadings();
   lpf = new LowPassFilter(ACC_FILTER_BUFFER_SIZE);
   gyroIntegrator = new GyroIntegrator();
+  esc = new ESC();
+  ailerons = new Ailerons();
+  elevator = new Elevator();
   writeFileHeader();
   start_time = millis();
   blink_time = start_time;
@@ -406,23 +449,28 @@ void setup() {
 }
 
 void loop() {
+  
   // read sensors and update related data structures
   readings->update();
   lpf->update(readings);
   gyroIntegrator->update(readings);
 
   if (flight_mode & FM_TERMINATE) {
-    setThrottle(0.0);
-    setAilerons(0.0);
-    setElevator(10.0);
+    esc->setThrottle(0.0);
+    ailerons->setRoll(0.0);
+    elevator->setPitch(10.0);
   } else if (flight_mode & BL_PREFLIGHT_CALIBRATE) {
     readings->recalibrate();
     readings->describe(&datalog);
     flight_mode = readings->isCalibrated() ? BL_PREFLIGHT_ARM : FM_TERMINATE;
   } else if (flight_mode & BL_PREFLIGHT_ARM) {
-    armESC();
-    waitForPitch();
-    flight_mode = FM_TAKEOFF;
+    esc->arm();
+    if (esc->isArmed()) {
+      waitForPitch();
+      flight_mode = FM_TAKEOFF;
+    } else {
+      flight_mode = FM_TERMINATE;
+    }
   } else if (flight_mode & FM_TAKEOFF) {
     
   } else if (flight_mode & FM_LAND_IMMEDIATELY) {
@@ -461,23 +509,7 @@ void recalibrateAHRS() {
   // here
 }
 
-void setThrottle(float setting) {
-  // here
-}
-
-void setElevator(float setting) {
-  // here
-}
-
-void setAilerons(float setting) {
-  // here
-}
-
 void loiter() {
-  // here
-}
-
-void armESC() {
   // here
 }
 
