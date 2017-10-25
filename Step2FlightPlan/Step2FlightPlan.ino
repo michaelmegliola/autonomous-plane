@@ -1,16 +1,4 @@
-/*
- * Step 1. Synchronous raw data logging.
- * 
- * This sketch logs data to and SDI (Micro SD) file as quickly
- * as possible. There is no timer or synchronization... the loop
- * simply takes sensor readings and writes raw, uncalibrated
- * results to a file.
- * 
- * The purpose of this step is to fly the aircraft by remote
- * control while collecting actual sensor readings. By aligning
- * those readings in time with a video of the flight, models can
- * be developed for (a) filters and (b) fusion algorithms.
- */
+
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_FXAS21002C.h>
@@ -44,8 +32,8 @@
  * Flight modes in order of precedence
  */
 const int FM_TERMINATE           = 0x0001;
-const int FM_PREFLIGHT_CALIBRATE = 0x0002;
-const int FM_PREFLIGHT_ARM       = 0x0004;
+const int BL_PREFLIGHT_CALIBRATE = 0x0002;  // BL prefix indicates blocking code
+const int BL_PREFLIGHT_ARM       = 0x0004;  // BL prefix indicates blocking code
 const int FM_TAKEOFF             = 0x0008;
 const int FM_LAND_IMMEDIATELY    = 0x0016;
 const int FM_MAINTAIN_ALTITUDE   = 0x0032;
@@ -367,12 +355,13 @@ void loop() {
 
   if (flight_mode & FM_TERMINATE) {
     setThrottle(0.0);
-    datalog.flush();
-  } else if (flight_mode & FM_PREFLIGHT_CALIBRATE) {
+    setAileron(0.0);
+    setElevator(10.0);
+  } else if (flight_mode & BL_PREFLIGHT_CALIBRATE) {
     readings->recalibrate();
     readings->describe(&datalog);
     flight_mode = readings->isCalibrated() ? FM_PREFLIGHT_ARM : FM_TERMINATE;
-  } else if (flight_mode & FM_PREFLIGHT_ARM) {
+  } else if (flight_mode & BL_PREFLIGHT_ARM) {
     armESC();
     waitForPitch();
     flight_mode = FM_TAKEOFF;
@@ -423,7 +412,7 @@ void setElevator(float setting) {
 }
 
 void setAilerons(float setting) {
-  
+  // here
 }
 
 void loiter() {
