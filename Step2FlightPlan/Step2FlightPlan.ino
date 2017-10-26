@@ -44,9 +44,11 @@ const int FM_RECALIBRATE_AHRS    = 0x0064;
 const int FM_SEEK_WAYPOINT       = 0x0128;
 const int FM_LOITER              = 0x0256;
 
-/*
- * Represents a single, complete set of sensor readings at a 
- * specified point in time (to the nearest millisecond).
+/*  =============================================================================
+ *  Sensor Readings
+ *  
+ *  Represents a single, complete set of sensor readings at a 
+ *  specified point in time (to the nearest millisecond).
  */
 class SensorReadings {
   
@@ -188,7 +190,7 @@ class SensorReadings {
       delay(300);
     }
   }
-  
+
   void calibrate() {
     if (!calibrated) {
       //trap prior accelerometer values
@@ -238,6 +240,12 @@ class SensorReadings {
   float getAltitude() {return altitude - altitudeCal;}
 };
 
+/*  =============================================================================
+ *  Low Pass Filter
+ *  
+ *  Reduces noise in sensor readings, at the expense of muting
+ *  or delaying the effect of rapid transient changes.
+ */
 class LowPassFilter {
 
   private:
@@ -287,6 +295,13 @@ class LowPassFilter {
   }
 };
 
+/*  =============================================================================
+ *  Gyro Integrator
+ *  
+ *  Maitains a running total of gyro readings... gyros measure angular velocity,
+ *  not position, so actual deflection (pitch, roll, or yaw) equals the sum of
+ *  (a) angular velocity multiplied by (b) time.
+ */
 class GyroIntegrator {
   
   private:
@@ -323,6 +338,12 @@ class GyroIntegrator {
   }
 };
 
+/*  =============================================================================
+ *  Elevator
+ *  
+ *  Represents the elevator control surface. Includes limits to prevent physical
+ *  damage or over-cycling of servo.
+ */
 class Elevator {
 
   private:
@@ -350,6 +371,13 @@ class Elevator {
   }
 };
 
+/*  =============================================================================
+ *  Ailerons
+ *  
+ *  Represents the aileron control surfaces. Includes limits to prevent physical
+ *  damage or over-cycling of servo. Note that ailerons are physically linked,
+ *  so raising one always lowers the other.
+ */
 class Ailerons {
 
   private:
@@ -377,6 +405,16 @@ class Ailerons {
   }
 };
 
+/*  =============================================================================
+ *  Electronic Speed Control
+ *  
+ *  Represents the speed control device that governs the electric motor and
+ *  propeller. Includes limits to keep throttle setting in bounds (note: the
+ *  lower bound, expressed in microseconds, is typically 1000, not zero).
+ *  
+ *  CAUTION: Must be armed before each use. ESC units typically disarm when
+ *  power is removed, but may remain armed in unit remains powered up.
+ */
 class ESC {
   private:
   int throttleMs;
@@ -410,9 +448,14 @@ class ESC {
     v = v > 10.0 ? 10.0 : v;
     v = v <  0.0 ?  0.0 : v;
     throttleMs = SERVO_MIN_MICROSECONDS + (v/10.0) * rangeMs;
+    esc.writeMicroseconds(throttleMs);
   }
 };
 
+/*  =============================================================================
+ *  Main flight control program starts here.
+ */
+ 
 // data logging file
 File datalog;
 
