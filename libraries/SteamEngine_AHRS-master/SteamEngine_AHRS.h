@@ -4,13 +4,16 @@
 #include <SD.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
+#include "SteamEngine_LPF.h"
 
 #define ACCEL_JITTER 0.50
 #define MIN_CALIBRATION_COUNT 1000 
+#define LOW_PASS_FILTER_SIZE 4
 
 class SteamEngineAHRS
 {
 public:
+  	float const PI_F = 3.14159265F;
 	SteamEngineAHRS(Adafruit_Sensor* accelerometer,  Adafruit_Sensor* gyroscope,  Adafruit_BMP280* barometer, int ledPin);
 	void recalibrate();
 	void update();
@@ -26,6 +29,8 @@ public:
 	float getGyroY();
 	float getGyroZ();
 	float getAltitude();
+	float getPitch();
+	float getRoll();
 
 private:
 	void calibrate();
@@ -38,6 +43,7 @@ private:
  	sensors_event_t* accelEvent;
 	sensors_event_t* gyroEvent;
 	sensors_event_t* barEvent;
+	sensors_vec_t* orientation;
 	
 	//primary registers
 	int led;
@@ -51,6 +57,11 @@ private:
 	float accX;
 	float accY;
 	float accZ;
+	float pitch;
+	float roll;
+	float iGyroX;
+	float iGyroY;
+	float iGyroZ;
 
 	//dynamically measured calibration constants
 	float accXcal;
@@ -62,6 +73,12 @@ private:
 	float altitudeCal;
 	int calibrationCount;
 	boolean calibrated;
+
+	//filters
+	SteamEngineLPF* lpfAccX;
+	SteamEngineLPF* lpfAccY;
+	SteamEngineLPF* lpfAccZ;
+	SteamEngineLPF* lpfAltitude;
 };
 
 #endif

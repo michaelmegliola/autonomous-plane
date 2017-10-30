@@ -45,61 +45,6 @@ const int FM_LOITER              = 0x0256;
 
 
 /*  =============================================================================
- *  Low Pass Filter
- *  
- *  Reduces noise in sensor readings, at the expense of muting
- *  or delaying the effect of rapid transient changes.
- */
-class LowPassFilter {
-
-  private:
-  
-  float *accXbuffer;
-  float *accYbuffer;
-  float *accZbuffer;
-  float *altBuffer;
-  int i;
-  int size;
-
-  public:
-  
-  LowPassFilter(int buffersize) {
-    size = buffersize;
-    accXbuffer = new float[size];
-    accYbuffer = new float[size];
-    accZbuffer = new float[size];
-    altBuffer = new float[size];
-    for (int n = 0; n < size; n++) {
-      accXbuffer[n] = 0.0;
-      accYbuffer[n] = 0.0;
-      accZbuffer[n] = 0.0;
-      altBuffer[n] = 0.0;
-    }
-    i = 0;
-  }
-  
-  void update(SteamEngineAHRS *sensorReadings) {
-    accXbuffer[i] = sensorReadings->getAccX();
-    accYbuffer[i] = sensorReadings->getAccY();
-    accZbuffer[i] = sensorReadings->getAccZ();
-    altBuffer[i] = sensorReadings->getAltitude();
-    i = ++i % size;
-  }
-  
-  float getAccX() {return getAverageValue(accXbuffer);}
-  float getAccY() {return getAverageValue(accYbuffer);}
-  float getAccZ() {return getAverageValue(accZbuffer);}
-  float getAltitude() {return getAverageValue(altBuffer);}
-  
-  private:
-  float getAverageValue(float *vals) {
-    float sum = 0.0;
-    for (int n = 0; n < size; n++) sum += vals[n];
-    return sum / (float) size;
-  }
-};
-
-/*  =============================================================================
  *  Gyro Integrator
  *  
  *  Maitains a running total of gyro readings... gyros measure angular velocity,
@@ -263,9 +208,12 @@ class ESC {
 // data logging file
 File datalog;
 
-// Low pass filter for accelerometer data
+// sensors
+Adafruit_BMP280 bmp;
+Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
+Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
+
 SteamEngineAHRS *readings;
-LowPassFilter *lpf;
 GyroIntegrator *gyroIntegrator;
 ESC *esc;
 
@@ -283,8 +231,7 @@ void setup() {
   initializeLEDs();
   initializeSdCard();
   datalog = getNextAvailableFileHandle();
-  readings = new SteamEngineAHRS();
-  lpf = new LowPassFilter(ACC_FILTER_BUFFER_SIZE);
+  readings = new SteamEngineAHRS(&accelmag, &gyro, &bmp, GREEN_LED);
   gyroIntegrator = new GyroIntegrator();
   esc = new ESC();
   ailerons = new Ailerons();
@@ -299,7 +246,6 @@ void loop() {
   
   // read sensors and update related data structures
   readings->update();
-  lpf->update(readings);
   gyroIntegrator->update(readings);
 
   if (flight_mode & FM_TERMINATE) {
@@ -377,7 +323,13 @@ void initializeLEDs() {
 
 void initializeSdCard() {
   if (!SD.begin(CHIP_SELECT)) {
-    readings->terminalError();
+    terminalError();
+  }
+}
+
+void terminalError() {
+  while(true) {
+    //code here
   }
 }
 
@@ -405,15 +357,15 @@ void writeToFile() {
   datalog.print(",");
   datalog.print(readings->getTimespan(), 12);
   datalog.print(",");
-  datalog.print(lpf->getAltitude());
+  datalog.print(readings->getAltitude());
   datalog.print(",");
   datalog.print(readings->getTemperature());
   datalog.print(",");  
-  datalog.print(lpf->getAccX(), 6);
+  datalog.print(readings->getAccX(), 6);
   datalog.print(",");
-  datalog.print(lpf->getAccY(), 6);
+  datalog.print(readings->getAccY(), 6);
   datalog.print(",");
-  datalog.print(lpf->getAccZ(), 6);
+  datalog.print(readings->getAccZ(), 6);
   datalog.print(",");
   datalog.print(readings->getGyroX(), 12);
   datalog.print(",");
