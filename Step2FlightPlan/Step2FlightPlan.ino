@@ -68,9 +68,9 @@ class GyroIntegrator {
   }
 
   void update(SteamEngineAHRS *s) {
-    ix += s->getGyroX() * RADIANS_TO_DEGREES * s->getTimespan();
-    iy += s->getGyroY() * RADIANS_TO_DEGREES * s->getTimespan();
-    iz += s->getGyroZ() * RADIANS_TO_DEGREES * s->getTimespan();
+//    ix += s->getGyroX() * RADIANS_TO_DEGREES * s->getTimespan();
+//    iy += s->getGyroY() * RADIANS_TO_DEGREES * s->getTimespan();
+//    iz += s->getGyroZ() * RADIANS_TO_DEGREES * s->getTimespan();
     //TODO: add correction based upon accelerometer, if in bounds.
   }
 
@@ -254,7 +254,7 @@ void loop() {
     elevator->setPitch(10.0);
   } else if (flight_mode & BL_PREFLIGHT_CALIBRATE) {
     readings->recalibrate();
-    readings->describe(&datalog);
+    //readings->describe(&datalog);
     flight_mode = readings->isCalibrated() ? BL_PREFLIGHT_ARM : FM_TERMINATE;
   } else if (flight_mode & BL_PREFLIGHT_ARM) {
     esc->arm();
@@ -353,30 +353,30 @@ void writeFileHeader() {
 }
 
 void writeToFile() {
-  datalog.print(readings->getTimestamp());
-  datalog.print(",");
-  datalog.print(readings->getTimespan(), 12);
-  datalog.print(",");
-  datalog.print(readings->getAltitude());
-  datalog.print(",");
-  datalog.print(readings->getTemperature());
-  datalog.print(",");  
-  datalog.print(readings->getAccX(), 6);
-  datalog.print(",");
-  datalog.print(readings->getAccY(), 6);
-  datalog.print(",");
-  datalog.print(readings->getAccZ(), 6);
-  datalog.print(",");
-  datalog.print(readings->getGyroX(), 12);
-  datalog.print(",");
-  datalog.print(readings->getGyroY(), 12);
-  datalog.print(",");
-  datalog.print(readings->getGyroZ(), 12);
-  datalog.print(",");
-  datalog.print(gyroIntegrator->getPitch(), 6);
-  datalog.print(",");
-  datalog.print(gyroIntegrator->getRoll(), 6);
-  datalog.print(",");
-  datalog.println(gyroIntegrator->getYaw(), 6);
+//  datalog.print(readings->getTimestamp());
+//  datalog.print(",");
+//  datalog.print(readings->getTimespan(), 12);
+//  datalog.print(",");
+//  datalog.print(readings->getAltitude());
+//  datalog.print(",");
+//  datalog.print(readings->getTemperature());
+//  datalog.print(",");  
+//  datalog.print(readings->getAccX(), 6);
+//  datalog.print(",");
+//  datalog.print(readings->getAccY(), 6);
+//  datalog.print(",");
+//  datalog.print(readings->getAccZ(), 6);
+//  datalog.print(",");
+//  datalog.print(readings->getGyroX(), 12);
+//  datalog.print(",");
+//  datalog.print(readings->getGyroY(), 12);
+//  datalog.print(",");
+//  datalog.print(readings->getGyroZ(), 12);
+//  datalog.print(",");
+//  datalog.print(gyroIntegrator->getPitch(), 6);
+//  datalog.print(",");
+//  datalog.print(gyroIntegrator->getRoll(), 6);
+//  datalog.print(",");
+//  datalog.println(gyroIntegrator->getYaw(), 6);
 }
 

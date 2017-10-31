@@ -12,50 +12,64 @@
 		_gyro = gyroscope;
 		_bar = barometer;
 		led = ledPin;
+		// NOTE: the sensor events must be separate, because the Adafruit
+		// library clears the entire data structure on update.
 		accelEvent = new sensors_event_t;
 		gyroEvent = new sensors_event_t;
 		barEvent = new sensors_event_t;
-		orientation = new sensors_vec_t;
-		lpfAccX = new SteamEngineLPF(LOW_PASS_FILTER_SIZE);
-		lpfAccY = new SteamEngineLPF(LOW_PASS_FILTER_SIZE);
-		lpfAccZ = new SteamEngineLPF(LOW_PASS_FILTER_SIZE);
-		lpfAltitude = new SteamEngineLPF(LOW_PASS_FILTER_SIZE);
-		resetCalibrationMetrics();
+		xyzGyro = new XyzCal();
+		xyzAccel = new XyzCal();
+		calibrationCount = 0;
+		calibrated = false;
 	}
 
 	void SteamEngineAHRS::update() { 
 		_gyro->getEvent(gyroEvent);
 		_accel->getEvent(accelEvent);
+
+		// use prior timestamp value to calculate time span...
 		timespan = (float) (gyroEvent->timestamp - timestamp) / 1000.0;
+		// ...then update timestamp to new value.
 		timestamp = gyroEvent->timestamp;
 
-		//TODO: apply low pass filter
-		altitude = _bar->readAltitude(1013.25) - altitudeCal;
+		//TODO: apply low pass filter?
+		altitude = _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA) - altitudeCal;
 		temperature = _bar->readTemperature();
-		gyroX = gyroEvent->gyro.x - gyroXcal;
-		gyroY = gyroEvent->gyro.y - gyroYcal;
-		gyroZ = gyroEvent->gyro.z - gyroZcal;
-
-		// apply low-pass filters to calibrated accelerometer readings.		
-		lpfAccX->update(accelEvent->acceleration.x - accXcal);
-		accX = lpfAccX->getFilteredVal();
 		
-		lpfAccY->update(accelEvent->acceleration.y - accYcal);
-		accY = lpfAccY->getFilteredVal();
+		// to save time and memory, there is only one xyz buffer, so use contents immediately
+		fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
+		xyzGyro->update(xyz);
 
-		lpfAccZ->update(accelEvent->acceleration.z - accZcal);
-		accZ = lpfAccZ->getFilteredVal();
+		fillXyz(accelEvent, SENSOR_TYPE_ACCELEROMETER);
+		xyzAccel->update(xyz);
 		
 		//TODO: integrate gyro readings and fuse into roll calculation
-		roll = (float) atan2(accY, accZ);
+		float* vec = xyzAccel->getXyz(FILTERED);
+		roll = (float) atan2(vec[Y], vec[Z]);
 		roll *= 180.0 / PI_F;
 		//TODO: integrate gyro readings and fuse into pitch calculation
-		if (accY * sin(roll) + accZ * cos(roll) == 0) {
-			pitch = accX > 0 ? (PI_F / 2) : (-PI_F / 2);
+		if (vec[Y] * sin(roll) + vec[Z] * cos(roll) == 0) {
+			pitch = vec[X] > 0 ? (PI_F / 2) : (-PI_F / 2);
 		} else {
-			pitch = (float) atan(-accX / (accY * sin(roll) + accZ * cos(roll)));
+			pitch = (float) atan(-vec[X] / (vec[Y] * sin(roll) + vec[Z] * cos(roll)));
 		}
 		pitch *= 180.0 / PI_F;
+	}
+
+	void SteamEngineAHRS::fillXyz(sensors_event_t* event, sensors_type_t type) {
+		switch(type) {
+			case SENSOR_TYPE_ACCELEROMETER:
+				xyz[X] = event->acceleration.x;
+				xyz[Y] = event->acceleration.y;
+				xyz[Z] = event->acceleration.z;
+			break;
+			
+			case SENSOR_TYPE_GYROSCOPE:
+				xyz[X] = event->gyro.x;
+				xyz[Y] = event->gyro.y;
+				xyz[Z] = event->gyro.z;
+			break;
+		}
 	}
 
 	void SteamEngineAHRS::recalibrate() {
@@ -72,77 +86,30 @@
 		digitalWrite(led, LOW);
 	}
 
- 	void SteamEngineAHRS::describe(File *file) {
-		file->println("START SENSOR CALIBRATION");
-		file->print("accXcal,");
-		file->println(accXcal, 12);
-		file->print("accYcal,");
-		file->println(accYcal, 12);
-		file->print("accZcal,");
-		file->println(accZcal, 12);
-		file->print("gyroXcal,");
-		file->println(gyroXcal, 12);
-		file->print("gyroYcal,");
-		file->println(gyroYcal, 12);
-		file->print("gyroZcal,");
-		file->println(gyroZcal, 12);
-		file->print("altitudeCal,");
-		file->println(altitudeCal, 12);
-		file->print("temperature,");
-		file->println(temperature, 12);
-		file->println("END SENSOR CALIBRATION");
-		file->flush();
-	}
-	
-	void SteamEngineAHRS::resetCalibrationMetrics() {
-		accXcal = 0.0;
-		accYcal = 0.0;
-		accZcal = 0.0;
-		gyroXcal = 0.0;
-		gyroYcal = 0.0;
-		gyroZcal = 0.0;
-		iGyroX = 0.0;
-		iGyroY = 0.0;
-		iGyroZ = 0.0;
-		altitudeCal = 0.0;
-		calibrationCount = 0;
-		calibrated = false;
-	}
-
 	void SteamEngineAHRS::calibrate() {
 		if (!calibrated) {
-			//trap prior accelerometer values
-			float ax = accX;
-			float ay = accY;
-			float az = accZ;
 			//update to current values
 			update();
 			//compare prior to current values
-			if (abs(accX) < ACCEL_JITTER && abs(accY) < ACCEL_JITTER && abs(accZ - SENSORS_GRAVITY_EARTH) < ACCEL_JITTER) {
+			if (!xyzAccel->isMoving(0.5)) {
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
-					accXcal /= (float) calibrationCount;
-					accYcal /= (float) calibrationCount;
-					accZcal /= (float) calibrationCount;
-					gyroXcal /= (float) calibrationCount;
-					gyroYcal /= (float) calibrationCount;
-					gyroZcal /= (float) calibrationCount;
-					altitudeCal /= (float) calibrationCount;      
+					xyzGyro->calibrate(calibrationCount);
+					xyzAccel->calibrate(calibrationCount);  
 					iGyroX = 0.0;
 					iGyroY = 0.0;
 					iGyroZ = 0.0;
 					calibrated = true;
 				} else {
-					accXcal += accX;
-					accYcal += accY;
-					accZcal += accZ - SENSORS_GRAVITY_EARTH;
-					gyroXcal += gyroX;
-					gyroYcal += gyroY;
-					gyroZcal += gyroZ;
-					altitudeCal += altitude;
+					fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
+					xyzGyro->accumulate(xyz);
+					fillXyz(accelEvent, SENSOR_TYPE_ACCELEROMETER);
+					xyzAccel->accumulate(xyz);
 					calibrationCount++;
 				}			
 			} else {    
-				resetCalibrationMetrics();
+				calibrationCount = 0;
+				xyzGyro->reset();
+				xyzAccel->reset();
 			}
 		}
 	}
@@ -151,13 +118,9 @@
 	unsigned long SteamEngineAHRS::getTimestamp() {return timestamp;}
 	float SteamEngineAHRS::getTimespan() {return timespan;}
 	float SteamEngineAHRS::getTemperature() {return temperature;}
-	float SteamEngineAHRS::getAccX() {return accX;}
-	float SteamEngineAHRS::getAccY() {return accY;}
-	float SteamEngineAHRS::getAccZ() {return accZ ;}
-	float SteamEngineAHRS::getGyroX() {return gyroX ;}
-	float SteamEngineAHRS::getGyroY() {return gyroY;}
-	float SteamEngineAHRS::getGyroZ() {return gyroZ;}
 	float SteamEngineAHRS::getAltitude() {return altitude;}
+	float* SteamEngineAHRS::getGyro(XyzType type) {return xyzGyro->getXyz(type);} 
+	float* SteamEngineAHRS::getAccel(XyzType type) {return xyzAccel->getXyz(type);}
 	float SteamEngineAHRS::getPitch() {return pitch;}
 	float SteamEngineAHRS::getRoll() {return roll;}
 
