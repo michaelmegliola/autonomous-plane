@@ -10,6 +10,7 @@
 #define ACCEL_JITTER 0.50
 #define MIN_CALIBRATION_COUNT 1000 
 #define LOW_PASS_FILTER_SIZE 4
+#define NULL 0
 
 class SteamEngineAHRS
 {
@@ -20,7 +21,7 @@ public:
 	void update();
 	void describe(File *file) ;
 	bool isCalibrated();
-	bool isMoving(float threshold);
+	bool isMoving();
 	unsigned long getTimestamp();
 	float getTimespan();
 	float getTemperature();

@@ -14,14 +14,13 @@ class XyzCal {
 		void calibrate(int divisor);
 		void reset();
 		float* getXyz(XyzType type);
-		bool isMoving(float threshold);
+		bool isMoving();
 		void dump(File* file);
 				
 	private:
 		float vals[4][3];	// XyzType, XyzAxis
 		float filter[4][3];	// buffer n, XyzAxis
 		int lpf;
-		float delta;
 };
 
 #endif

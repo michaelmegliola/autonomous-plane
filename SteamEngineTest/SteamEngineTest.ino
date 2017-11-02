@@ -9,7 +9,7 @@
 File datalog;
 
 // sensors
-Adafruit_BMP280 bmp;
+//Adafruit_BMP280 bmp;
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
 Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
 
@@ -20,7 +20,8 @@ SteamEngineAHRS* ahrs;
 File logfile;
 
 void setup() {
-
+  Serial.begin(9600);
+  while (!Serial) {}
   if (!SD.begin(4)) {
     Serial.println("Card failed, or not present");
     return;
@@ -44,15 +45,19 @@ void setup() {
     while(1);
   }
 
-  if (!bmp.begin()) {
-    Serial.println("Ooops, no BMP280 detected ... Check your wiring!");
-    while(1);
-  }
-
-  ahrs = new SteamEngineAHRS(&accelmag, &gyro, &bmp, 8);
+  Serial.println("STARTING...");
+  ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);
   ahrs->recalibrate();
 }
 
 void loop() {
   ahrs->update();
+  
+  Serial.print(ahrs->getAccel(RAW)[Z], 12);
+  Serial.print(" ");
+  Serial.print(ahrs->getAccel(CALIBRATION)[Z], 12);
+  Serial.print(" ");
+  Serial.print(ahrs->getAccel(CORRECTED)[Z], 12);
+  Serial.print(" ");
+  Serial.println(ahrs->getAccel(FILTERED)[Z], 12);
 }

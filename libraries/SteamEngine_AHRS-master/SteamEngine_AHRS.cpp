@@ -7,7 +7,7 @@
 
 #include "SteamEngine_AHRS.h"
  
-	SteamEngineAHRS::SteamEngineAHRS(Adafruit_Sensor* accelerometer,  Adafruit_Sensor* gyroscope,   Adafruit_BMP280* barometer, int ledPin) {
+	SteamEngineAHRS::SteamEngineAHRS(Adafruit_Sensor* accelerometer, Adafruit_Sensor* gyroscope, Adafruit_BMP280* barometer, int ledPin) {
 		_accel = accelerometer;
 		_gyro = gyroscope;
 		_bar = barometer;
@@ -24,8 +24,8 @@
 	}
 
 	void SteamEngineAHRS::update() { 
-		_gyro->getEvent(gyroEvent);
-		_accel->getEvent(accelEvent);
+		if (_gyro != NULL) _gyro->getEvent(gyroEvent);
+		if (_accel != NULL) _accel->getEvent(accelEvent);
 
 		// use prior timestamp value to calculate time span...
 		timespan = (float) (gyroEvent->timestamp - timestamp) / 1000.0;
@@ -33,8 +33,10 @@
 		timestamp = gyroEvent->timestamp;
 
 		//TODO: apply low pass filter?
-		altitude = _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA) - altitudeCal;
-		temperature = _bar->readTemperature();
+		if (_bar != NULL) {
+			altitude = _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA) - altitudeCal;
+			temperature = _bar->readTemperature();
+		}
 		
 		// to save time and memory, there is only one xyz buffer, so use contents immediately
 		fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
@@ -91,7 +93,7 @@
 			//update to current values
 			update();
 			//compare prior to current values
-			if (!xyzAccel->isMoving(0.5)) {
+			if (!xyzAccel->isMoving()) {
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
 					xyzGyro->calibrate(calibrationCount);
 					xyzAccel->calibrate(calibrationCount);  

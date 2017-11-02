@@ -5,17 +5,14 @@ XyzCal::XyzCal() {
 }
 
 void XyzCal::update(float* xyz) {
-	float maxDelta = abs(xyz[X] - vals[RAW][X]);
 	for (int i = 0; i < 3; i++) {
-		float d = abs(xyz[i] - vals[RAW][i]);
-		maxDelta = ( d > maxDelta ) ? d : maxDelta;
+		float d = xyz[i] - vals[RAW][i];
 		vals[RAW][i] = xyz[i];
 		//TODO: check for reading delta; ignore if out-of-bounds
 		vals[CORRECTED][i] = vals[RAW][i] + vals[CALIBRATION][i];
 		filter[lpf][i] = vals[CORRECTED][i];
 	}
 	lpf = ++lpf % 4;
-	delta = maxDelta;
 }
 
 void XyzCal::accumulate(float* xyz) {
@@ -52,7 +49,7 @@ float* XyzCal::getXyz(XyzType type) {
 		for (int i = 0; i < 3; i++) {
 			vals[FILTERED][i] = 0.0;
 		}
-		for (int i=0; i < 4; i++) {
+		for (int i = 0; i < 4; i++) {
 			for (int j = 0; j < 3; j++) {
 				vals[FILTERED][j] += filter[i][j];
 			}
@@ -64,8 +61,8 @@ float* XyzCal::getXyz(XyzType type) {
 	}
 }
 
-bool XyzCal::isMoving(float threshold) {
-	return delta > threshold;
+bool XyzCal::isMoving() {
+	return vals[RAW][Z] > 9.8 && vals[RAW][Z] < 10.6;
 }
 
 void XyzCal::dump(File* file) {
