@@ -19,9 +19,12 @@ SteamEngineAHRS* ahrs;
 // file for data logging
 File logfile;
 
+unsigned long flashtime;
+bool flash;
+
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {}
+  //while (!Serial) {}
   if (!SD.begin(4)) {
     Serial.println("Card failed, or not present");
     return;
@@ -48,10 +51,18 @@ void setup() {
   Serial.println("STARTING...");
   ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);
   ahrs->recalibrate();
+
+  flashtime = millis();
 }
 
 void loop() {
   ahrs->update();
+
+  if (flashtime > millis() + 5000) {
+    digitalWrite(RED_LED, flash ? HIGH : LOW);
+    flash = !flash;
+    flashtime = millis();
+  }
   
   Serial.print(ahrs->getAccel(RAW)[Z], 12);
   Serial.print(" ");

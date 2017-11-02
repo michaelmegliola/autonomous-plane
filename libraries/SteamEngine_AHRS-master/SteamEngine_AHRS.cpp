@@ -79,7 +79,7 @@
 		boolean flash = false;
 		while (!calibrated) {
 			calibrate();
-			if (millis() > start + 50) {   
+			if (millis() > start + 250) {   
 				digitalWrite(led, flash ? HIGH : LOW);
 				flash = !flash; 
 				start = millis();
@@ -93,7 +93,17 @@
 			//update to current values
 			update();
 			//compare prior to current values
-			if (!xyzAccel->isMoving()) {
+			if (xyzAccel->isMoving()) {
+				calibrationCount = 0;
+				xyzGyro->reset();
+				xyzAccel->reset();
+				for (int i  = 0;  i < 10; i++) {
+					digitalWrite(RED_LED, HIGH);
+					delay(50);
+					digitalWrite(RED_LED, LOW);
+					delay(50);
+				}
+			} else {
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
 					xyzGyro->calibrate(calibrationCount);
 					xyzAccel->calibrate(calibrationCount);  
@@ -107,16 +117,12 @@
 					fillXyz(accelEvent, SENSOR_TYPE_ACCELEROMETER);
 					xyzAccel->accumulate(xyz);
 					calibrationCount++;
-				}			
-			} else {    
-				calibrationCount = 0;
-				xyzGyro->reset();
-				xyzAccel->reset();
+				}
 			}
 		}
 	}
 	  
-	boolean SteamEngineAHRS::isCalibrated() {return calibrated;}
+	bool SteamEngineAHRS::isCalibrated() {return calibrated;}
 	unsigned long SteamEngineAHRS::getTimestamp() {return timestamp;}
 	float SteamEngineAHRS::getTimespan() {return timespan;}
 	float SteamEngineAHRS::getTemperature() {return temperature;}

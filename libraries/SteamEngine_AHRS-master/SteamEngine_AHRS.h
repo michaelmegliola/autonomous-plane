@@ -11,6 +11,7 @@
 #define MIN_CALIBRATION_COUNT 1000 
 #define LOW_PASS_FILTER_SIZE 4
 #define NULL 0
+#define RED_LED 13
 
 class SteamEngineAHRS
 {
