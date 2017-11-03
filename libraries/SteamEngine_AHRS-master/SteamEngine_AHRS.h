@@ -22,7 +22,7 @@ public:
 	void update();
 	void describe(File *file) ;
 	bool isCalibrated();
-	bool isMoving();
+	bool isApproximatelyLevel();	// used in calibration sequence only
 	unsigned long getTimestamp();
 	float getTimespan();
 	float getTemperature();
@@ -36,7 +36,8 @@ private:
 	void calibrate();
 	void resetCalibrationMetrics();
 	void fillXyz(sensors_event_t* event, sensors_type_t type);
-
+	void countdownFlash();
+	
 	//sensors and events
 	Adafruit_Sensor* _accel;
 	Adafruit_Sensor* _gyro;
@@ -51,7 +52,7 @@ private:
 	float timespan;
 	float xyz[3];
 	XyzCal* xyzGyro;
-	XyzCal *xyzAccel;
+	XyzCal* xyzAccel;
 	float altitude;
 	float temperature;
 	float pitch;

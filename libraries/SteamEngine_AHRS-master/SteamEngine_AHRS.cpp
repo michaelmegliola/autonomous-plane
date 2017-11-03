@@ -73,37 +73,23 @@
 			break;
 		}
 	}
-
-	void SteamEngineAHRS::recalibrate() {
-		unsigned long start = millis();
-		boolean flash = false;
-		while (!calibrated) {
-			calibrate();
-			if (millis() > start + 250) {   
-				digitalWrite(led, flash ? HIGH : LOW);
-				flash = !flash; 
-				start = millis();
-			}
+	
+	void SteamEngineAHRS::countdownFlash() {
+		for (int i = 10; i > 0; i--) {
+			digitalWrite(RED_LED, HIGH);
+			delay(i * 100);
+			digitalWrite(RED_LED, LOW);
+			delay(i * 100);
 		}
-		digitalWrite(led, LOW);
 	}
 
-	void SteamEngineAHRS::calibrate() {
-		if (!calibrated) {
+	void SteamEngineAHRS::recalibrate() {
+		countdownFlash();
+		while (!calibrated) {
 			//update to current values
 			update();
 			//compare prior to current values
-			if (xyzAccel->isMoving()) {
-				calibrationCount = 0;
-				xyzGyro->reset();
-				xyzAccel->reset();
-				for (int i  = 0;  i < 10; i++) {
-					digitalWrite(RED_LED, HIGH);
-					delay(50);
-					digitalWrite(RED_LED, LOW);
-					delay(50);
-				}
-			} else {
+			if (isApproximatelyLevel()) {
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
 					xyzGyro->calibrate(calibrationCount);
 					xyzAccel->calibrate(calibrationCount);  
@@ -118,8 +104,17 @@
 					xyzAccel->accumulate(xyz);
 					calibrationCount++;
 				}
+			} else {
+				calibrationCount = 0;
+				xyzGyro->reset();
+				xyzAccel->reset();
+				countdownFlash();
 			}
 		}
+	}
+	
+	bool SteamEngineAHRS::isApproximatelyLevel() {
+		return xyzAccel->isApproximatelyLevel();
 	}
 	  
 	bool SteamEngineAHRS::isCalibrated() {return calibrated;}

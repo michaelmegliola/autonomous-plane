@@ -9,7 +9,7 @@ void XyzCal::update(float* xyz) {
 		float d = xyz[i] - vals[RAW][i];
 		vals[RAW][i] = xyz[i];
 		//TODO: check for reading delta; ignore if out-of-bounds
-		vals[CORRECTED][i] = vals[RAW][i] + vals[CALIBRATION][i];
+		vals[CORRECTED][i] = vals[RAW][i] - vals[CALIBRATION][i];
 		filter[lpf][i] = vals[CORRECTED][i];
 	}
 	lpf = ++lpf % 4;
@@ -61,8 +61,9 @@ float* XyzCal::getXyz(XyzType type) {
 	}
 }
 
-bool XyzCal::isMoving() {
-	return vals[RAW][Z] > 9.8 && vals[RAW][Z] < 10.6;
+bool XyzCal::isApproximatelyLevel() {
+	float z = getXyz(FILTERED)[Z];
+	return z > SENSORS_GRAVITY_EARTH - 0.75 && z < SENSORS_GRAVITY_EARTH + 0.75;	
 }
 
 void XyzCal::dump(File* file) {

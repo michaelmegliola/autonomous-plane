@@ -1,6 +1,7 @@
 #ifndef __STEAM_ENGINE_XYZCAL_H__
 #define __STEAM_ENGINE_XYZCAL_H__
 
+#include <Adafruit_Sensor.h>
 #include <SD.h>
 
 enum XyzAxis { X, Y, Z };
@@ -14,7 +15,7 @@ class XyzCal {
 		void calibrate(int divisor);
 		void reset();
 		float* getXyz(XyzType type);
-		bool isMoving();
+		bool isApproximatelyLevel();
 		void dump(File* file);
 				
 	private:

@@ -24,7 +24,7 @@ bool flash;
 
 void setup() {
   Serial.begin(9600);
-  //while (!Serial) {}
+  while (!Serial) {}
   if (!SD.begin(4)) {
     Serial.println("Card failed, or not present");
     return;
@@ -50,6 +50,13 @@ void setup() {
 
   Serial.println("STARTING...");
   ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);
+
+  while (!ahrs->isApproximatelyLevel()) {
+     ahrs->update();
+     Serial.println(ahrs->getAccel(FILTERED)[Z], 12);
+     delay(250);
+  }
+  Serial.println("Recalibrating...");
   ahrs->recalibrate();
 
   flashtime = millis();
@@ -58,7 +65,7 @@ void setup() {
 void loop() {
   ahrs->update();
 
-  if (flashtime > millis() + 5000) {
+  if (millis() > flashtime + 5000) {
     digitalWrite(RED_LED, flash ? HIGH : LOW);
     flash = !flash;
     flashtime = millis();
