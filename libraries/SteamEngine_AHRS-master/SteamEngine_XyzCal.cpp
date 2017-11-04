@@ -1,12 +1,12 @@
 #include "SteamEngine_XyzCal.h"
 
-XyzCal::XyzCal() {
+XyzCal::XyzCal(XyzSensor s) {
+	sensor = s;
 	reset();
 }
 
 void XyzCal::update(float* xyz) {
 	for (int i = 0; i < 3; i++) {
-		float d = xyz[i] - vals[RAW][i];
 		vals[RAW][i] = xyz[i];
 		//TODO: check for reading delta; ignore if out-of-bounds
 		vals[CORRECTED][i] = vals[RAW][i] - vals[CALIBRATION][i];
@@ -17,14 +17,16 @@ void XyzCal::update(float* xyz) {
 
 void XyzCal::accumulate(float* xyz) {
 	for (int i = 0; i < 3; i++) {
-		vals[RAW][i] += xyz[i];
+		vals[CALIBRATION][i] += xyz[i];
 	}
 }
 
 void XyzCal::calibrate(int divisor) {
 	for (int i = 0; i < 3; i++) {
-		vals[CALIBRATION][i] += vals[RAW][i] / (float) divisor;
-		vals[RAW][i] = 0.0;
+		vals[CALIBRATION][i] /= (float) divisor;
+	}
+	if (sensor == ACCEL) {
+		vals[CALIBRATION][Z] -= SENSORS_GRAVITY_EARTH;
 	}
 }
 
@@ -62,7 +64,7 @@ float* XyzCal::getXyz(XyzType type) {
 }
 
 bool XyzCal::isApproximatelyLevel() {
-	float z = getXyz(FILTERED)[Z];
+	float z = getXyz(RAW)[Z];
 	return z > SENSORS_GRAVITY_EARTH - 0.75 && z < SENSORS_GRAVITY_EARTH + 0.75;	
 }
 

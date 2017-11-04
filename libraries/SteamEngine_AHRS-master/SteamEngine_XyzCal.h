@@ -4,12 +4,13 @@
 #include <Adafruit_Sensor.h>
 #include <SD.h>
 
+enum XyzSensor { ACCEL, GYRO };
 enum XyzAxis { X, Y, Z };
-enum XyzType { RAW, CALIBRATION, CORRECTED, FILTERED };
+enum XyzType { RAW, CALIBRATION, CORRECTED, FILTERED, INTEGRAL, DERIVATIVE };
 
 class XyzCal {
 	public:
-		XyzCal();
+		XyzCal(XyzSensor sensor);
 		void update(float* xyz);
 		void accumulate(float* xyz);
 		void calibrate(int divisor);
@@ -22,6 +23,7 @@ class XyzCal {
 		float vals[4][3];	// XyzType, XyzAxis
 		float filter[4][3];	// buffer n, XyzAxis
 		int lpf;
+		XyzSensor sensor;
 };
 
 #endif

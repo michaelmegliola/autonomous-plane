@@ -17,8 +17,8 @@
 		accelEvent = new sensors_event_t;
 		gyroEvent = new sensors_event_t;
 		barEvent = new sensors_event_t;
-		xyzGyro = new XyzCal();
-		xyzAccel = new XyzCal();
+		xyzGyro = new XyzCal(GYRO);
+		xyzAccel = new XyzCal(ACCEL);
 		calibrationCount = 0;
 		calibrated = false;
 	}

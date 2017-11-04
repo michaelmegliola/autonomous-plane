@@ -21,6 +21,7 @@ File logfile;
 
 unsigned long flashtime;
 bool flash;
+double iGyro;
 
 void setup() {
   Serial.begin(9600);
@@ -51,14 +52,9 @@ void setup() {
   Serial.println("STARTING...");
   ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);
 
-  while (!ahrs->isApproximatelyLevel()) {
-     ahrs->update();
-     Serial.println(ahrs->getAccel(FILTERED)[Z], 12);
-     delay(250);
-  }
   Serial.println("Recalibrating...");
   ahrs->recalibrate();
-
+  iGyro = 0.0;
   flashtime = millis();
 }
 
@@ -70,12 +66,18 @@ void loop() {
     flash = !flash;
     flashtime = millis();
   }
-  
-  Serial.print(ahrs->getAccel(RAW)[Z], 12);
+
+  iGyro += ahrs->isApproximatelyLevel() ? 0.0 : ahrs->getGyro(CORRECTED)[X],
+
+Serial.print(ahrs->getAccel(RAW)[Z], 12);
+Serial.print(" ");
+Serial.print(ahrs->getAccel(CORRECTED)[Z], 12);
+Serial.print("    ");
+  Serial.print(ahrs->getGyro(RAW)[X], 12);
   Serial.print(" ");
-  Serial.print(ahrs->getAccel(CALIBRATION)[Z], 12);
+  Serial.print(ahrs->getGyro(CALIBRATION)[X], 12);
   Serial.print(" ");
-  Serial.print(ahrs->getAccel(CORRECTED)[Z], 12);
+  Serial.print(ahrs->getGyro(CORRECTED)[X], 12);
   Serial.print(" ");
-  Serial.println(ahrs->getAccel(FILTERED)[Z], 12);
+  Serial.println(iGyro, 12);
 }
