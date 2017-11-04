@@ -67,11 +67,17 @@ void loop() {
     flashtime = millis();
   }
 
-  iGyro += ahrs->isApproximatelyLevel() ? 0.0 : ahrs->getGyro(CORRECTED)[X],
-
+  if (ahrs->isApproximatelyLevel()) {
+    iGyro = 0.0;
+  } else {
+    iGyro += ahrs->getGyro(CORRECTED)[X];
+  }
+  
 Serial.print(ahrs->getAccel(RAW)[Z], 12);
 Serial.print(" ");
 Serial.print(ahrs->getAccel(CORRECTED)[Z], 12);
+Serial.print(" ");
+Serial.print(ahrs->isApproximatelyLevel());
 Serial.print("    ");
   Serial.print(ahrs->getGyro(RAW)[X], 12);
   Serial.print(" ");
