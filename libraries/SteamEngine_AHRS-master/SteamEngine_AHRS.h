@@ -21,18 +21,18 @@ public:
 	void recalibrate();
 	void update();
 	void describe(File *file) ;
-	bool isCalibrated();
-	bool isApproximatelyLevel();	// used in calibration sequence only
+	bool isCalibrated();	
 	unsigned long getTimestamp();
 	float getTimespan();
 	float getTemperature();
 	float* getGyro(XyzType type);
 	float* getAccel(XyzType type);
 	float getAltitude();
-	float getPitch();
-	float getRoll();
+	float getStaticPitch();
+	float getStaticRoll();
 
 private:
+	bool isApproximatelyLevel();	// used in calibration sequence only
 	void calibrate();
 	void resetCalibrationMetrics();
 	void fillXyz(sensors_event_t* event, sensors_type_t type);

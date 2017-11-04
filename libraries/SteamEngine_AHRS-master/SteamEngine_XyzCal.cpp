@@ -63,11 +63,6 @@ float* XyzCal::getXyz(XyzType type) {
 	}
 }
 
-bool XyzCal::isApproximatelyLevel() {
-	float z = getXyz(RAW)[Z];
-	return z > SENSORS_GRAVITY_EARTH - 0.75 && z < SENSORS_GRAVITY_EARTH + 0.75;	
-}
-
 void XyzCal::dump(File* file) {
 	file->println("START OF REGISTERS");
 	file->println("RAW,CALIBRATION,CORRECTED,FILTERED");

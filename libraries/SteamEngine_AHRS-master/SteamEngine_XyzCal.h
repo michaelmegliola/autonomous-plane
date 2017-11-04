@@ -16,7 +16,6 @@ class XyzCal {
 		void calibrate(int divisor);
 		void reset();
 		float* getXyz(XyzType type);
-		bool isApproximatelyLevel();
 		void dump(File* file);
 				
 	private:

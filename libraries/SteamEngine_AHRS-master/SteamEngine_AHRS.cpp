@@ -48,13 +48,16 @@
 		//TODO: integrate gyro readings and fuse into roll calculation
 		float* vec = xyzAccel->getXyz(FILTERED);
 		roll = (float) atan2(vec[Y], vec[Z]);
-		roll *= 180.0 / PI_F;
+		
 		//TODO: integrate gyro readings and fuse into pitch calculation
 		if (vec[Y] * sin(roll) + vec[Z] * cos(roll) == 0) {
 			pitch = vec[X] > 0 ? (PI_F / 2) : (-PI_F / 2);
 		} else {
 			pitch = (float) atan(-vec[X] / (vec[Y] * sin(roll) + vec[Z] * cos(roll)));
 		}
+		
+		// convert to degrees
+		roll *= 180.0 / PI_F;
 		pitch *= 180.0 / PI_F;
 	}
 
@@ -114,7 +117,8 @@
 	}
 	
 	bool SteamEngineAHRS::isApproximatelyLevel() {
-		return xyzAccel->isApproximatelyLevel();
+		float* vec = xyzAccel->getXyz(RAW);
+		return vec[Z] > SENSORS_GRAVITY_EARTH - 0.50 && vec[Z] < SENSORS_GRAVITY_EARTH + 0.50;
 	}
 	  
 	bool SteamEngineAHRS::isCalibrated() {return calibrated;}
@@ -124,7 +128,7 @@
 	float SteamEngineAHRS::getAltitude() {return altitude;}
 	float* SteamEngineAHRS::getGyro(XyzType type) {return xyzGyro->getXyz(type);} 
 	float* SteamEngineAHRS::getAccel(XyzType type) {return xyzAccel->getXyz(type);}
-	float SteamEngineAHRS::getPitch() {return pitch;}
-	float SteamEngineAHRS::getRoll() {return roll;}
+	float SteamEngineAHRS::getStaticPitch() {return pitch;}
+	float SteamEngineAHRS::getStaticRoll() {return roll;}
 
 
