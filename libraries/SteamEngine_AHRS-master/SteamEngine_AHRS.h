@@ -12,6 +12,8 @@
 #define LOW_PASS_FILTER_SIZE 4
 #define NULL 0
 #define RED_LED 13
+#define ALT_TIME_LIMIT_MILLIS 300
+#define ALT_ACCEL_LIMIT_MPS 25.0
 
 class SteamEngineAHRS
 {
@@ -23,21 +25,27 @@ public:
 	void logHeader(File* file);
 	void log(File* file);
 	bool isCalibrated();	
+	bool isAltimeterUpdating();
 	unsigned long getTimestamp();
 	float getTimespan();
 	float getTemperature();
 	float* getGyro(XyzType type);
 	float* getAccel(XyzType type);
 	float getAltitude();
+	float getDeltaAltitude();
 	float getStaticPitch();
 	float getStaticRoll();
 
 private:
 	bool isApproximatelyLevel();	// used in calibration sequence only
+	void reset();
 	void calibrate();
 	void resetCalibrationMetrics();
 	void fillXyz(sensors_event_t* event, sensors_type_t type);
 	void countdownFlash();
+	int altTimestamp;
+	bool altIsUpdated;
+	float dAlt_dt;
 	
 	//sensors and events
 	Adafruit_Sensor* _accel;
