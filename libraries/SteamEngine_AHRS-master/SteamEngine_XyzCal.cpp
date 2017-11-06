@@ -1,18 +1,47 @@
 #include "SteamEngine_XyzCal.h"
 
-XyzCal::XyzCal(XyzSensor s) {
+XyzCal::XyzCal(XyzSensor s, bool filtered) {
 	sensor = s;
+	hasFilter = filtered;
 	reset();
 }
 
-void XyzCal::update(float* xyz) {
+void XyzCal::update(float* xyz, float seconds) {
+	
+	float* pidVec = hasFilter ? getXyz(FILTERED) : getXyz(CORRECTED);
+	
 	for (int i = 0; i < 3; i++) {
+	//	trap prior value to allow calculation of rate of change (DERIVATIVE), below.
+		float prior = pidVec[i];
+	//	record new values in primary registers
 		vals[RAW][i] = xyz[i];
-		//TODO: check for reading delta; ignore if out-of-bounds
+	//	TODO: check for reading delta; ignore if out-of-bounds?
 		vals[CORRECTED][i] = vals[RAW][i] - vals[CALIBRATION][i];
-		filter[lpf][i] = vals[CORRECTED][i];
+	//	apply low-pass filter (if enabled)
+		if (hasFilter) {
+			filter[lpf][i] = vals[CORRECTED][i];
+			vals[FILTERED][i] = 0.0;
+			for (int j = 0; j < 4; j++) {
+				vals[FILTERED][i] += filter[j][i];
+			}
+			vals[FILTERED][i] /= 4.0;
+		}
+	//	calculate INTEGRAL (running sum) and DERIVATIVE (rate of change)	
+		vals[INTEGRAL][i] += pidVec[i];	
+		vals[DERIVATIVE][i] = (pidVec[i] - prior) / seconds;
 	}
 	lpf = ++lpf % 4;
+}
+
+void XyzCal::postCalibrate() {
+	for (int i = 0; i < 3; i++) {
+		vals[FILTERED][i] = 0.0;
+		vals[INTEGRAL][i] = 0.0;
+		vals[DERIVATIVE][i] = 0.0;
+		for (int j = 0; j < 4; j++) {
+			filter[j][i] = 0.0;
+		}
+	}
 }
 
 void XyzCal::accumulate(float* xyz) {
@@ -31,9 +60,16 @@ void XyzCal::calibrate(int divisor) {
 }
 
 void XyzCal::reset() {
-	for (int i = 0; i < 4; i++) {
+//	registers
+	for (int i = 0; i < 6; i++) {
 		for (int j = 0; j < 3; j++) {
 			vals[i][j] = 0.0;
+		}
+	}
+//	low-pass filter
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 3; j++) {
+			filter[i][j] = 0.0;
 		}
 	}
 	lpf = 0;
@@ -48,40 +84,27 @@ float* XyzCal::getXyz(XyzType type) {
 	case CORRECTED:
 		return vals[CORRECTED];
 	case FILTERED:
-		for (int i = 0; i < 3; i++) {
-			vals[FILTERED][i] = 0.0;
-		}
-		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < 3; j++) {
-				vals[FILTERED][j] += filter[i][j];
-			}
-		}
-		for (int i = 0; i < 3; i++) {
-			vals[FILTERED][i] /= 4.0;
-		}
-		return vals[FILTERED];	
+		return hasFilter ? vals[FILTERED] : vals[CORRECTED];
+	case INTEGRAL:
+		return vals[INTEGRAL];
+	case DERIVATIVE:
+		return vals[DERIVATIVE];
 	}
+}	
+		
+void XyzCal::logHeader(File* file) {
+	file->print("SENSOR,X-RAW,Y-RAW,Z-RAW,X-CAL,Y-CAL,Z-CAL,");
+	file->print("X-P,Y-P,Z-P,X-PF,Y-PF,Z-PF,");
+	file->print("X-I,Y-I,Z-I,X-D,Y-D,Z-D,");
 }
 
-void XyzCal::dump(File* file) {
-	file->println("START OF REGISTERS");
-	file->println("RAW,CALIBRATION,CORRECTED,FILTERED");
-	getXyz(FILTERED); //refresh filter
-	for (int i = 0; i < 4; i++) {
+void XyzCal::log(File* file) {
+	file->print(sensor == ACCEL ? "ACCEL," : "GYRO,");
+	for (int i = 0; i < 6; i++) {
 		for (int j = 0; j < 3; j++) {
-			file->print(vals[i][j], 12);
+			file->print(vals[i][j], 7);
+			file->print(",");
 		}
-		file->println();
 	}
-	file->println("END OF REGISTERS");
-	file->println("START OF LPF BUFFERS");
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 3; j++) {
-			file->print(filter[i][j], 12);
-		}
-		file->println();
-	}
-	file->println("END OF LPF BUFFERS");
-	file->flush();
 }
 

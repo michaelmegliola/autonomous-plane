@@ -23,53 +23,65 @@ unsigned long flashtime;
 bool flash;
 double iGyro;
 
+String getFileName(int i) {
+  String s = "DATA";
+  s += i;
+  s += ".csv";
+  return s;
+}
+
+File getNextAvailableFileHandle() {
+  int i = 0;
+  while (SD.exists(getFileName(i))) {
+    i++;
+  }
+  return SD.open(getFileName(i), FILE_WRITE);
+}
+
+void error() {
+  while (true) {
+    digitalWrite(RED_LED, HIGH);
+    delay(100);
+    digitalWrite(RED_LED, LOW);
+    delay(100);
+  }
+}
+
 void setup() {
-  Serial.begin(9600);
-  while (!Serial) {}
   if (!SD.begin(4)) {
-    Serial.println("Card failed, or not present");
-    return;
+    error();
   }
 
-  logfile = SD.open("SteamEngineTest.csv", FILE_WRITE);  // open the logfile for writing
+  logfile = getNextAvailableFileHandle();
   if( ! logfile ) {
-    Serial.print("Could not create file.");
+    error();
   }
   
   if(!accelmag.begin())
   {
-    Serial.println("Ooops, no FXOS8700 detected ... Check your wiring!");
-    while(1);
+    error();
   }  
 
-  Serial.println("Gyroscope Test"); Serial.println("");
   if(!gyro.begin())
   {
-    Serial.println("Ooops, no FXAS21002C detected ... Check your wiring!");
-    while(1);
+    error();
   }
 
-  Serial.println("STARTING...");
-  ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);
-
-  Serial.println("Recalibrating...");
-  
+  ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);  
+  ahrs->logHeader(&logfile);
   ahrs->recalibrate();
-  iGyro = 0.0;
   flashtime = millis();
 }
 
 void loop() {
   ahrs->update();
-
-  if (millis() > flashtime + 5000) {
+  ahrs->log(&logfile);
+  
+  if (millis() > flashtime + 1500) {
+    logfile.flush();
     digitalWrite(RED_LED, flash ? HIGH : LOW);
     flash = !flash;
     flashtime = millis();
   }
-
-Serial.print(ahrs->getStaticPitch(), 12);
-Serial.print(" ");
-Serial.println(ahrs->getStaticRoll(), 12);
 
 }

@@ -17,8 +17,8 @@
 		accelEvent = new sensors_event_t;
 		gyroEvent = new sensors_event_t;
 		barEvent = new sensors_event_t;
-		xyzGyro = new XyzCal(GYRO);
-		xyzAccel = new XyzCal(ACCEL);
+		xyzGyro = new XyzCal(GYRO, false);
+		xyzAccel = new XyzCal(ACCEL, true);
 		calibrationCount = 0;
 		calibrated = false;
 	}
@@ -40,10 +40,10 @@
 		
 		// to save time and memory, there is only one xyz buffer, so use contents immediately
 		fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
-		xyzGyro->update(xyz);
+		xyzGyro->update(xyz, timespan);
 
 		fillXyz(accelEvent, SENSOR_TYPE_ACCELEROMETER);
-		xyzAccel->update(xyz);
+		xyzAccel->update(xyz, timespan);
 		
 		//TODO: integrate gyro readings and fuse into roll calculation
 		float* vec = xyzAccel->getXyz(FILTERED);
@@ -96,9 +96,6 @@
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
 					xyzGyro->calibrate(calibrationCount);
 					xyzAccel->calibrate(calibrationCount);  
-					iGyroX = 0.0;
-					iGyroY = 0.0;
-					iGyroZ = 0.0;
 					calibrated = true;
 				} else {
 					fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
@@ -114,6 +111,8 @@
 				countdownFlash();
 			}
 		}
+		xyzGyro->postCalibrate();
+		xyzAccel->postCalibrate();	
 	}
 	
 	bool SteamEngineAHRS::isApproximatelyLevel() {
@@ -130,5 +129,22 @@
 	float* SteamEngineAHRS::getAccel(XyzType type) {return xyzAccel->getXyz(type);}
 	float SteamEngineAHRS::getStaticPitch() {return pitch;}
 	float SteamEngineAHRS::getStaticRoll() {return roll;}
+	
+	void SteamEngineAHRS::logHeader(File* file) {
+		file->print("TIME,TIMESPAN,");
+		xyzAccel->logHeader(file);
+		xyzGyro->logHeader(file);
+		file->println("");
+	}
+	
+	void SteamEngineAHRS::log(File* file) {
+		file->print(timestamp);
+		file->print(",");
+		file->print(timespan, 12);
+		file->print(",");
+		xyzAccel->log(file);
+		xyzGyro->log(file);
+		file->println("");
+	}
 
 

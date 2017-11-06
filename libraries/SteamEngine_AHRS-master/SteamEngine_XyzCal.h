@@ -10,16 +10,19 @@ enum XyzType { RAW, CALIBRATION, CORRECTED, FILTERED, INTEGRAL, DERIVATIVE };
 
 class XyzCal {
 	public:
-		XyzCal(XyzSensor sensor);
-		void update(float* xyz);
+		XyzCal(XyzSensor sensor, bool filtered);
+		void update(float* xyz, float seconds);
 		void accumulate(float* xyz);
 		void calibrate(int divisor);
 		void reset();
 		float* getXyz(XyzType type);
-		void dump(File* file);
+		void logHeader(File* file);
+		void log(File* file);
+		void postCalibrate();
 				
 	private:
-		float vals[4][3];	// XyzType, XyzAxis
+		bool hasFilter;
+		float vals[6][3];	// XyzType, XyzAxis
 		float filter[4][3];	// buffer n, XyzAxis
 		int lpf;
 		XyzSensor sensor;

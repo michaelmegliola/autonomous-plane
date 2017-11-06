@@ -20,7 +20,8 @@ public:
 	SteamEngineAHRS(Adafruit_Sensor* accelerometer,  Adafruit_Sensor* gyroscope,  Adafruit_BMP280* barometer, int ledPin);
 	void recalibrate();
 	void update();
-	void describe(File *file) ;
+	void logHeader(File* file);
+	void log(File* file);
 	bool isCalibrated();	
 	unsigned long getTimestamp();
 	float getTimespan();
@@ -41,7 +42,7 @@ private:
 	//sensors and events
 	Adafruit_Sensor* _accel;
 	Adafruit_Sensor* _gyro;
-	 Adafruit_BMP280* _bar;
+	Adafruit_BMP280* _bar;
  	sensors_event_t* accelEvent;
 	sensors_event_t* gyroEvent;
 	sensors_event_t* barEvent;
@@ -57,9 +58,6 @@ private:
 	float temperature;
 	float pitch;
 	float roll;
-	float iGyroX;
-	float iGyroY;
-	float iGyroZ;
 	
 	float altitudeCal;
 	int calibrationCount;
