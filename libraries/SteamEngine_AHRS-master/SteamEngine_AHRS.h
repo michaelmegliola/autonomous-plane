@@ -32,9 +32,11 @@ public:
 	float* getGyro(XyzType type);
 	float* getAccel(XyzType type);
 	float getAltitude();
+	float getAltitudeRaw();
 	float getDeltaAltitude();
 	float getStaticPitch();
 	float getStaticRoll();
+	float getAltitudeCalibration();
 
 private:
 	bool isApproximatelyLevel();	// used in calibration sequence only

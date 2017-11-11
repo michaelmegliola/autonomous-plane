@@ -33,18 +33,25 @@
 
 		if (_bar != NULL) {
 		//	elminated extreme readings from altimeter (unless time limit as elapsed). 
-			float reading =  _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA) - altitudeCal;
-			float altTimespan = (float) ( timestamp - altTimestamp ) / 1000.0;
-			dAlt_dt = ( reading - altitude ) / altTimespan;
-			if (  (dAlt_dt > -1.0 * ALT_ACCEL_LIMIT_MPS && dAlt_dt < ALT_ACCEL_LIMIT_MPS) || timestamp > altTimestamp + ALT_TIME_LIMIT_MILLIS) {
-		//		the alitimeter is returning valid reading (or time limit has elapsed)...
+			float reading = _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA) - altitudeCal;
+			if (altTimestamp == 0) {
 				altitude = reading;
 				altTimestamp = timestamp;
+				dAlt_dt = 0.0;
 				altIsUpdated = true;
 			} else {
-		//		the alitimeter is returning spurious readings...
-				dAlt_dt = 0.0;
-				altIsUpdated = false;
+				float altTimespan = (float) ( timestamp - altTimestamp ) / 1000.0;
+				dAlt_dt = ( reading - altitude ) / altTimespan;
+				if ( (dAlt_dt > -1.0 * ALT_ACCEL_LIMIT_MPS && dAlt_dt < ALT_ACCEL_LIMIT_MPS) || timestamp > altTimestamp + ALT_TIME_LIMIT_MILLIS) {
+			//		the alitimeter is returning valid reading (or time limit has elapsed)...
+					altitude = reading;
+					altTimestamp = timestamp;
+					altIsUpdated = true;
+				} else {
+			//		the alitimeter is returning spurious readings...
+					dAlt_dt = 0.0;
+					altIsUpdated = false;
+				}
 			}
 			temperature = _bar->readTemperature();
 		}
@@ -75,7 +82,11 @@
 	float SteamEngineAHRS::getDeltaAltitude() {
 		return dAlt_dt;
 	}
-
+	
+	float SteamEngineAHRS::getAltitudeCalibration() {
+		return altitudeCal;
+	}
+	
 	void SteamEngineAHRS::fillXyz(sensors_event_t* event, sensors_type_t type) {
 		switch(type) {
 			case SENSOR_TYPE_ACCELEROMETER:
@@ -103,6 +114,7 @@
 
 	void SteamEngineAHRS::recalibrate() {
 		countdownFlash();
+		// Calibrate accelerometer and gyroscope
 		while (!calibrated) {
 			//update to current values
 			update();
@@ -110,7 +122,7 @@
 			if (isApproximatelyLevel()) {
 				if (calibrationCount >= MIN_CALIBRATION_COUNT) {
 					xyzGyro->calibrate(calibrationCount);
-					xyzAccel->calibrate(calibrationCount);  
+					xyzAccel->calibrate(calibrationCount);
 					calibrated = true;
 				} else {
 					fillXyz(gyroEvent, SENSOR_TYPE_GYROSCOPE);
@@ -126,9 +138,17 @@
 				countdownFlash();
 			}
 		}
+		// Calibrate altimeter
+		altitudeCal = 0.0;
+		for (int i = 0; i < 10; i++) {
+			update();
+			altitudeCal += _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
+		}
+		altitudeCal /= 10.0;
+		altTimestamp = 0;
+		// Prepare accelerometer & gyroscope for calibrated use
 		xyzGyro->postCalibrate();
 		xyzAccel->postCalibrate();
-		altitudeCal = altitude;
 	}
 
 	void SteamEngineAHRS::reset() {
@@ -153,9 +173,10 @@
 	float* SteamEngineAHRS::getAccel(XyzType type) {return xyzAccel->getXyz(type);}
 	float SteamEngineAHRS::getStaticPitch() {return pitch;}
 	float SteamEngineAHRS::getStaticRoll() {return roll;}
+	float SteamEngineAHRS::getAltitudeRaw() {return _bar == NULL ? 0.0 : _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA);}
 	
 	void SteamEngineAHRS::logHeader(File* file) {
-		file->print("TIME,TIMESPAN,");
+		file->print("TIME,TIMESPAN,ALTITUDE_RAW,ALTITUDE,D_ALT_D_T,TEMPERATURE,");
 		xyzAccel->logHeader(file);
 		xyzGyro->logHeader(file);
 		file->println("");
@@ -165,6 +186,14 @@
 		file->print(timestamp);
 		file->print(",");
 		file->print(timespan, 12);
+		file->print(",");
+		file->print(getAltitudeRaw(), 3);
+		file->print(",");
+		file->print(altitude, 3);
+		file->print(",");
+		file->print(dAlt_dt, 7);
+		file->print(",");
+		file->print(temperature, 3);
 		file->print(",");
 		xyzAccel->log(file);
 		xyzGyro->log(file);

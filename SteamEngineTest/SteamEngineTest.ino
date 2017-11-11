@@ -9,7 +9,7 @@
 File datalog;
 
 // sensors
-//Adafruit_BMP280 bmp;
+Adafruit_BMP280 bmp;
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
 Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
 
@@ -53,21 +53,12 @@ void setup() {
   }
 
   logfile = getNextAvailableFileHandle();
-  if( ! logfile ) {
-    error();
-  }
-  
-  if(!accelmag.begin())
-  {
-    error();
-  }  
+  if (!logfile) error();
+  if (!accelmag.begin(ACCEL_RANGE_8G)) error(); 
+  if (!gyro.begin()) error();
+  if (!bmp.begin()) error();
 
-  if(!gyro.begin())
-  {
-    error();
-  }
-
-  ahrs = new SteamEngineAHRS(&accelmag, &gyro, NULL, 8);  
+  ahrs = new SteamEngineAHRS(&accelmag, &gyro, &bmp, 8);  
   ahrs->logHeader(&logfile);
   ahrs->recalibrate();
   flashtime = millis();
