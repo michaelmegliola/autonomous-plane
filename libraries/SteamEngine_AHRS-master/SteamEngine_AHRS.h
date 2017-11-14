@@ -5,7 +5,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 #include "SteamEngine_XyzCal.h"
-#include "SteamEngine_LPF.h"
 
 #define ACCEL_JITTER 0.50
 #define MIN_CALIBRATION_COUNT 1000 
@@ -13,7 +12,7 @@
 #define NULL 0
 #define RED_LED 13
 #define ALT_TIME_LIMIT_MILLIS 300
-#define ALT_ACCEL_LIMIT_MPS 25.0
+#define ALT_CLIMB_LIMIT_MPS 40.0	  //a more realistic value is 10 -- this value is intended to identify erroneous readings only
 
 class SteamEngineAHRS
 {
@@ -47,6 +46,7 @@ private:
 	void countdownFlash();
 	int altTimestamp;
 	bool altIsUpdated;
+	float altTimespan;
 	float dAlt_dt;
 	
 	//sensors and events
@@ -72,9 +72,6 @@ private:
 	float altitudeCal;
 	int calibrationCount;
 	boolean calibrated;
-
-	//filters
-	SteamEngineLPF* lpfAltitude;
 };
 
 #endif

@@ -19,8 +19,19 @@ SteamEngineAHRS ahrs = SteamEngineAHRS(&accelmag, &gyro, &bmp, 8);
 // file for data logging
 File logfile;
 
-unsigned long flashtime;
-bool flash;
+enum FlightMode { ABORT, PREFLIGHT, TAKEOFF, LANDING };
+FlightMode mode;
+
+float targetAlt;
+
+void error() {
+  while (true) {
+    digitalWrite(RED_LED, HIGH);
+    delay(100);
+    digitalWrite(RED_LED, LOW);
+    delay(100);
+  }
+}
 
 String getFileName(int i) {
   String s = "DATA";
@@ -37,15 +48,6 @@ File getNextAvailableFileHandle() {
   return SD.open(getFileName(i), FILE_WRITE);
 }
 
-void error() {
-  while (true) {
-    digitalWrite(RED_LED, HIGH);
-    delay(100);
-    digitalWrite(RED_LED, LOW);
-    delay(100);
-  }
-}
-
 void setup() {
   if (!SD.begin(4)) {
     error();
@@ -59,18 +61,48 @@ void setup() {
  
   ahrs.logHeader(&logfile);
   ahrs.recalibrate();
-  flashtime = millis();
+  mode = PREFLIGHT;
 }
 
 void loop() {
-  ahrs.update();
-  ahrs.log(&logfile);
   
-  if (millis() > flashtime + 1500) {
-    logfile.flush();
-    digitalWrite(RED_LED, flash ? HIGH : LOW);
-    flash = !flash;
-    flashtime = millis();
+  //always update sensors
+  ahrs.update();
+  
+  //excute flight mode
+  switch (mode) {
+    case ABORT:
+    abort();
+    break;
+    
+    case PREFLIGHT:
+    break;
+    
+    case TAKEOFF:
+    break;
+    
+    case LANDING:
+    break;  
   }
-
+  ahrs.log(&logfile);
 }
+
+void abort() {
+  setThrottle(0.0);
+}
+
+void takeoff() {
+  
+}
+
+void landing() {
+  setTargetAltitude(0.0);
+  proceed();
+}
+
+void proceed() {
+  if (getAltitude() < 10.0) {
+  }
+}
+}
+

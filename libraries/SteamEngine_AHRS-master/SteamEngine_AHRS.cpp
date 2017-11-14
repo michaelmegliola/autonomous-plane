@@ -23,6 +23,7 @@
 	}
 
 	void SteamEngineAHRS::update() { 
+
 		if (_gyro != NULL) _gyro->getEvent(gyroEvent);
 		if (_accel != NULL) _accel->getEvent(accelEvent);
 
@@ -39,17 +40,16 @@
 				altTimestamp = timestamp;
 				dAlt_dt = 0.0;
 				altIsUpdated = true;
-			} else {
-				float altTimespan = (float) ( timestamp - altTimestamp ) / 1000.0;
+			} else if ( reading != altitude || timestamp > altTimestamp + ALT_TIME_LIMIT_MILLIS ) {  //altimeter may update slowly... ignore unchanged readings
+				altTimespan = (float) ( timestamp - altTimestamp ) / 1000.0;
 				dAlt_dt = ( reading - altitude ) / altTimespan;
-				if ( (dAlt_dt > -1.0 * ALT_ACCEL_LIMIT_MPS && dAlt_dt < ALT_ACCEL_LIMIT_MPS) || timestamp > altTimestamp + ALT_TIME_LIMIT_MILLIS) {
+				if ( (dAlt_dt > -2.5 * ALT_CLIMB_LIMIT_MPS && dAlt_dt < ALT_CLIMB_LIMIT_MPS) || timestamp > altTimestamp + ALT_TIME_LIMIT_MILLIS) {
 			//		the alitimeter is returning valid reading (or time limit has elapsed)...
 					altitude = reading;
 					altTimestamp = timestamp;
 					altIsUpdated = true;
 				} else {
 			//		the alitimeter is returning spurious readings...
-					dAlt_dt = 0.0;
 					altIsUpdated = false;
 				}
 			}
@@ -139,12 +139,27 @@
 			}
 		}
 		// Calibrate altimeter
-		altitudeCal = 0.0;
-		for (int i = 0; i < 10; i++) {
-			update();
-			altitudeCal += _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
+		bool altCalibrated = false;
+		float* alts = new float[10];
+		float max;
+		float min;
+		while (!altCalibrated) {
+			altitudeCal = 0.0;
+			for (int i = 0; i < 10; i++) {
+				alts[i] = _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
+				max = ( i == 0 || alts[i] > max ) ? alts[i] : max;
+				min = ( i ==0 || alts[i] < min ) ? alts[i] : min;
+				delay(20);
+			}
+			if ( max - min < 1.0 ) {
+				for (int i = 0; i < 10; i++) {
+					altitudeCal += alts[i];
+				}
+				altitudeCal /= 10.0;
+				altCalibrated = true;			
+			}	
 		}
-		altitudeCal /= 10.0;
+		delete(alts);
 		altTimestamp = 0;
 		// Prepare accelerometer & gyroscope for calibrated use
 		xyzGyro->postCalibrate();
@@ -176,7 +191,7 @@
 	float SteamEngineAHRS::getAltitudeRaw() {return _bar == NULL ? 0.0 : _bar->readAltitude(SENSORS_PRESSURE_SEALEVELHPA);}
 	
 	void SteamEngineAHRS::logHeader(File* file) {
-		file->print("TIME,TIMESPAN,ALTITUDE_RAW,ALTITUDE,D_ALT_D_T,TEMPERATURE,");
+		file->print("TIME,TIMESPAN,ALTITUDE_RAW,ALTITUDE,ALT_TIMESPAN,D_ALT_D_T,TEMPERATURE,");
 		xyzAccel->logHeader(file);
 		xyzGyro->logHeader(file);
 		file->println("");
@@ -190,6 +205,8 @@
 		file->print(getAltitudeRaw(), 3);
 		file->print(",");
 		file->print(altitude, 3);
+		file->print(",");
+		file->print(altTimespan, 7);
 		file->print(",");
 		file->print(dAlt_dt, 7);
 		file->print(",");

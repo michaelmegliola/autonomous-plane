@@ -1,3 +1,18 @@
+/*
+	Represents one set of calibrated readings from a sensor with three degrees of
+	freedom (eg, an x-y-z accelerometer or x-y-z gyroscope). Includes an optional
+	low-pass filter (to apply the filter, specify filter=TRUE when constructing 
+	instance).
+
+	Maintains most recent sensor values:
+		RAW = most recent raw reading from sensor
+		CALIBRATION = constant used to correct raw readings
+		CORRECTED = RAW + CALIBRATION (corrected reading)
+		FILTERED = corrected readings after application of optional low-pass filter (else zero)
+		INTEGRAL = cumulative sum of FILTERED if availabe, otherwise CORRECTED
+		DERIVATIVE = most recent change (per second) in FILTERED if available, otherwise CORRECTED
+*/
+
 #ifndef __STEAM_ENGINE_XYZCAL_H__
 #define __STEAM_ENGINE_XYZCAL_H__
 
